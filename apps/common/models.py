@@ -129,7 +129,7 @@ class Department(CommonModel):
         verbose_name = "Подразделение"
         verbose_name_plural = "Подразделения"
 
-    name = models.CharField(verbose_name="Имя подразделения", max_length=64)
+    name = models.CharField(verbose_name="Имя подразделения", max_length=128)
     shortname = models.CharField(blank=True, null=True, verbose_name="Аббревиатура", max_length=16)
     code = models.CharField(verbose_name="Код подразделения", max_length=16)
     parent_department = models.ForeignKey(

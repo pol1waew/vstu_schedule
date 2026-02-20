@@ -378,9 +378,9 @@ class DepartmentAdmin(BaseAdmin):
 
         def queryset(self, request, queryset):
             if self.value() in self.HAS_VALUES:
-                return queryset.filter(parent_department__isnull=True)
-            elif self.value() in self.HAS_NOT_VALUES:
                 return queryset.filter(parent_department__isnull=False)
+            elif self.value() in self.HAS_NOT_VALUES:
+                return queryset.filter(parent_department__isnull=True)
             
             return queryset
         
@@ -462,7 +462,7 @@ class DayDateOverrideAdmin(BaseAdmin):
         """Applies selected DayDateOverrides
         """
         
-        import api.utility_filters as filters
+        import apps.common.services.utility_filters as filters
 
         for ddo in queryset:
             reader = ReadAPI(filters.DateFilter.from_singe_date(ddo.day_source))
