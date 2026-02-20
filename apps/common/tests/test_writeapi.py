@@ -21,10 +21,8 @@ from apps.common.models import (
     EventKind
 )
 
-
 """py manage.py test api.tests.test_writeapi
 """
-
 
 class TestWriteAPI(TestCase):
     def setUp(self):
@@ -111,4 +109,5 @@ class TestWriteAPI(TestCase):
         ABS_EVENT.participants.set(PARTICIPANTS)
         ABS_EVENT.places.set(PLACES)
 
+        #TODO
         print(WriteAPI.get_semester_filling_parameters(ABS_EVENT))

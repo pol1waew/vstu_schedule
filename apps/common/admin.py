@@ -1,6 +1,5 @@
 from django.contrib import admin, messages
 from django.utils import timezone
-from django.utils.html import format_html
 from django.urls import path
 from django.http import HttpResponseRedirect
 from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
@@ -43,7 +42,7 @@ class BaseAdmin(admin.ModelAdmin):
 
 @admin.register(Subject)
 class SubjectAdmin(BaseAdmin):
-    change_list_template = "../templates/api/subjectChangeListExtend.html"
+    change_list_template = "../templates/panel/admin/subjectChangeListExtend.html"
     list_display = ("name",)
     search_fields = ("name",)
 
@@ -60,7 +59,7 @@ class SubjectAdmin(BaseAdmin):
 
 @admin.register(EventParticipant)
 class EventParticipantAdmin(BaseAdmin):
-    change_list_template = "../templates/api/eventParticipantChangeListExtend.html"
+    change_list_template = "../templates/panel/admin/eventParticipantChangeListExtend.html"
     list_display = ("name", "role")
     search_fields = ("name", "role")
     list_filter = ("role",)
@@ -86,7 +85,7 @@ class EventParticipantAdmin(BaseAdmin):
 
 @admin.register(EventPlace)
 class EventPlaceAdmin(BaseAdmin):
-    change_list_template = "../templates/api/eventPlaceChangeListExtend.html"
+    change_list_template = "../templates/panel/admin/eventPlaceChangeListExtend.html"
     list_display = ("building", "room")
     search_fields = ("building", "room")
     list_filter = ("building",)
@@ -136,7 +135,7 @@ class ScheduleTemplateAdmin(BaseAdmin):
 
 @admin.register(Schedule)
 class ScheduleAdmin(BaseAdmin):
-    change_list_template = "../templates/api/scheduleChangeListExtend.html"
+    change_list_template = "../templates/panel/admin/scheduleChangeListExtend.html"
     list_display = ("faculty", "status", "course", "semester", "years")
     search_fields = ("schedule_template__metadata__faculty", "schedule_template__metadata__scope")
     list_filter = (
@@ -295,7 +294,7 @@ class AbstractEventChangesAdmin(BaseAdmin):
 
 @admin.register(AbstractEvent)
 class AbstractEventAdmin(BaseAdmin):
-    change_list_template = "../templates/api/abstractEventChangeListExtend.html"
+    change_list_template = "../templates/panel/admin/abstractEventChangeListExtend.html"
     list_display = ("datemodified", "subject", "abstract_day", "time_slot")
     search_fields = ("participants__name", "subject__name", "places__building", "places__room", "kind__name")
     list_filter = ("kind__name",)
@@ -309,7 +308,7 @@ class AbstractEventAdmin(BaseAdmin):
         if request.method == "POST" and request.FILES.get("selected_file"):
             ## TODO: when working with big files should use chunks() instead
             EventImportAPI.import_event_data(request.FILES['selected_file'].read())
-            messages.success(request, format_html(f"Импорт из файла <b>\"{request.FILES['selected_file']}\"</b> успешно произведён"))
+            messages.success(request, f"Успешно произведён импорт из файла: \"{request.FILES['selected_file']}\"")
 
         return HttpResponseRedirect("../")
 
@@ -352,7 +351,7 @@ class AbstractEventAdmin(BaseAdmin):
 
 @admin.register(AbstractDay)
 class AbstractDayAdmin(BaseAdmin):
-    change_list_template = "../templates/api/abstractDayChangeListExtend.html"
+    change_list_template = "../templates/panel/admin/abstractDayChangeListExtend.html"
     list_display = ("name", "day_number")
     search_fields = ("name", "day_number")
 
@@ -385,7 +384,7 @@ class DepartmentAdmin(BaseAdmin):
             
             return queryset
         
-    change_list_template = "../templates/api/departmentChangeListExtend.html"
+    change_list_template = "../templates/panel/admin/departmentChangeListExtend.html"
     list_display = ("name", "shortname", "organization_name")
     search_fields = ("name", "shortname", "organization__name")
     list_filter = (HasParentDepartmentFilter, "organization__name")
@@ -416,7 +415,7 @@ class DepartmentAdmin(BaseAdmin):
 
 @admin.register(Organization)
 class OrganizationAdmin(BaseAdmin):
-    change_list_template = "../templates/api/organizationChangeListExtend.html"
+    change_list_template = "../templates/panel/admin/organizationChangeListExtend.html"
     list_display = ("name",)
     search_fields = ("name",)
     list_filter = ("name",)
@@ -436,7 +435,7 @@ class OrganizationAdmin(BaseAdmin):
 
 @admin.register(TimeSlot)
 class TimeSlotAdmin(BaseAdmin):
-    change_list_template = "../templates/api/timeSlotChangeListExtend.html"
+    change_list_template = "../templates/panel/admin/timeSlotChangeListExtend.html"
     list_display = ("alt_name", "start_time", "end_time")
     search_fields = ("alt_name", "start_time", "end_time")
     list_filter = ("alt_name",)

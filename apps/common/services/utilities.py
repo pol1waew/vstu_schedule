@@ -164,12 +164,12 @@ class Utilities:
         """Take time slot and convert it into acceptable format
 
         Time slot must be present
-            as alt name: \d-\d
+            as alt name: \\d-\\d
             as start time: HH:MM or HH.MM
             as start and end times: START_TIME-END_TIME or START_TIME END_TIME
 
         Returns time slot structured as (ALT_NAME, START_TIME, END_TIME) 
-        and formated as (\d-\d HH:MM HH:MM). Empty values equals ''
+        and formated as (\\d-\\d HH:MM HH:MM). Empty values equals ''
         """
 
         # 1-2

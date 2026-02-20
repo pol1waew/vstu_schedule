@@ -2,8 +2,6 @@ import re
 import json
 from datetime import datetime, date, timedelta
 
-from rest_framework.exceptions import ValidationError
-
 from apps.common.services.utilities import Utilities, ReadAPI, WriteAPI
 from apps.common.models import (
     EventPlace,
