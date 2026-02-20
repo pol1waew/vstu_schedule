@@ -22,7 +22,7 @@ from apps.common.models import (
 )
 
 
-"""py manage.py test visualization.tests.test_logic
+"""python manage.py test apps.client.tests.test_logic
 """
 
 

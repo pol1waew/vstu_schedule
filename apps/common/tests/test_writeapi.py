@@ -21,7 +21,7 @@ from apps.common.models import (
     EventKind
 )
 
-"""py manage.py test api.tests.test_writeapi
+"""python manage.py test apps.common.tests.test_writeapi
 """
 
 class TestWriteAPI(TestCase):

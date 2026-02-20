@@ -5,7 +5,7 @@ from django.test import TestCase
 from apps.common.models import TimeSlot, EventPlace
 from apps.common.services.utility_filters import TimeSlotFilter, PlaceFilter
 
-"""py manage.py test api.tests.test_utility_filters
+"""python manage.py test apps.common.tests.test_utility_filters
 """
 
 class TestTimeSlotFiltering(TestCase):

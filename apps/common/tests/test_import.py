@@ -24,7 +24,7 @@ from apps.common.models import (
 )
 
 
-"""py manage.py test api.tests.test_import
+"""python manage.py test apps.common.tests.test_import
 """
 
 
@@ -905,10 +905,11 @@ class TestEventImporter(TestCase):
                 1
             )
 
+    ## TODO: ...
     def test_(self):
         
 
-        with open("testdata/test_import_1.json", "r", encoding="utf8") as data_file:
+        with open("apps/common/tests/data/test_import_1.json", "r", encoding="utf8") as data_file:
             json_data = json.loads(data_file.read())
 
         reference_lookup = {
@@ -949,7 +950,7 @@ class TestEventImporter(TestCase):
         # manualy created TimeSlot
         TimeSlot.objects.create(alt_name="11-12", start_time=datetime.strptime("17:00:00", "%H:%M:%S"), end_time=datetime.strptime("18:30:00", "%H:%M:%S"))
 
-        with open("testdata/test_import_1.json", "r", encoding="utf8") as data_file:
+        with open("apps/common/tests/data/test_import_1.json", "r", encoding="utf8") as data_file:
             EventImportAPI.import_event_data(data_file.read())
 
         try:
