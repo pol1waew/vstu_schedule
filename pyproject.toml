@@ -22,4 +22,5 @@ django-celery-beat = { git = "https://github.com/celery/django-celery-beat", rev
 dev = [
     "pytest>=9.0.2",
     "pytest-django>=4.11.1",
+    "ruff>=0.15.2",
 ]
