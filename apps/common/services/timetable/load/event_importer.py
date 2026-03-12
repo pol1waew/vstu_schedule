@@ -1,23 +1,37 @@
-import re
 import json
-from datetime import datetime, date, timedelta
+import re
+from datetime import date, datetime, timedelta
 
-from apps.common.services.utilities import Utilities, ReadAPI, WriteAPI
 from apps.common.models import (
-    EventPlace,
-    Department,
-    Organization,
-    EventParticipant,
-    Subject,
     AbstractDay,
-    ScheduleTemplateMetadata,
-    ScheduleTemplate,
-    ScheduleMetadata,
-    Schedule,
-    Event,
-    AbstractEvent,
+    Department,
     EventKind,
+    EventParticipant,
+    EventPlace,
+    Schedule,
+    Subject,
     TimeSlot,
+)
+from apps.common.selectors import Selector
+from apps.common.services.timetable.utilities.model_helpers import (
+    is_abstract_event_already_exists,
+)
+from apps.common.services.timetable.utilities.normalizers import (
+    normalize_kind_name,
+    normalize_participant_name,
+    normalize_place_building_and_room,
+    normalize_scope,
+    normalize_subject_name,
+    normalize_time_slot_display_name,
+)
+from apps.common.services.timetable.utilities.utilities import (
+    get_number_from_month_name,
+    get_scope_from_label,
+    replace_roman_with_arabic_numerals,
+)
+from apps.common.services.timetable.write.factories import (
+    create_abstract_event,
+    fill_semester_for_dates,
 )
 
 
@@ -47,7 +61,7 @@ class EventImporter:
         """Applies data on database
         """
         
-        schedule = cls.find_schedule(Utilities.replace_all_roman_with_arabic_numerals(title))
+        schedule = cls.find_schedule(replace_roman_with_arabic_numerals(title))
         reference_lookup = {
             "subjects" : {},
             "kinds" : {},
@@ -201,30 +215,30 @@ class EventImporter:
         places : set[tuple[str, str]] = set()
         time_slots : set[str] = set()
 
-        subjects.add(Utilities.normalize_subject_name(event_data["subject"]))
+        subjects.add(normalize_subject_name(event_data["subject"]))
 
-        kinds.add(Utilities.normalize_kind_name(event_data["kind"]))
+        kinds.add(normalize_kind_name(event_data["kind"]))
 
         for teacher in event_data.get("participants", {}).get("teachers", []):
-            normalized_teacher = Utilities.normalize_participant_name(teacher)
+            normalized_teacher = normalize_participant_name(teacher)
 
             if normalized_teacher:
                 teachers.add(normalized_teacher)
                 
         for group in event_data.get("participants", {}).get("student_groups", []):
-            normalized_group = Utilities.normalize_participant_name(group)
+            normalized_group = normalize_participant_name(group)
 
             if normalized_group:
                 groups.add(normalized_group)
 
         for place in event_data.get("places", []):
-            normalized_place = Utilities.normalize_place_repr(place)
+            normalized_place = normalize_place_building_and_room(place)
 
             if normalized_place:
                 places.add(normalized_place)
 
         for time_slot in event_data.get("hours", []):
-            normalized_time_slot = Utilities.normalize_time_slot_repr(time_slot)
+            normalized_time_slot = normalize_time_slot_display_name(time_slot)
 
             if normalized_time_slot:
                 time_slots.add(normalized_time_slot)
@@ -374,7 +388,7 @@ class EventImporter:
         # 2024 -  2025
         FULL_YEARS_REG_EX = r"(\d{4}\s*-\s*\d{4})"
         
-        reader = ReadAPI()
+        reader = Selector()
 
         course_match = re.search(COURSE_REG_EX, title, flags=re.IGNORECASE)
         if course_match:
@@ -404,8 +418,8 @@ class EventImporter:
 
         scope_match = re.search(SCOPE_REG_EX, title)
         if scope_match:
-            reader.add_filter({"schedule_template__metadata__scope" : Utilities.get_scope_value(
-                Utilities.normalize_scope(scope_match.group(1))
+            reader.add_filter({"schedule_template__metadata__scope" : get_scope_from_label(
+                normalize_scope(scope_match.group(1))
             )})
 
         semester_match = re.search(ARABIC_NUMERALS_SEMESTER_REG_EX, title, flags=re.IGNORECASE)
@@ -478,7 +492,7 @@ class EventImporter:
                 calendar[key][week_day["week_day_index"]] = []
 
                 for month in week_day["calendar"]:
-                    month_number = Utilities.get_month_number(months[month["month_index"]])
+                    month_number = get_number_from_month_name(months[month["month_index"]])
 
                     for month_day in month["month_days"]:
                         calendar[key][week_day["week_day_index"]].append(
@@ -528,312 +542,13 @@ class EventImporter:
 
         for date_ in holds_on_dates:
             for time_slot in time_slots:
-                if ReadAPI.is_abstract_event_already_exists(
+                if is_abstract_event_already_exists(
                     kind, subject, participants, places, abstract_day, time_slot, date_, schedule
                 ):
                     continue
                 
-                created_abstract_event = WriteAPI.create_abstract_event(
+                created_abstract_event = create_abstract_event(
                     kind, subject, participants, places, abstract_day, time_slot, date_, schedule
                 )
 
-                WriteAPI.fill_semester_by_dates(created_abstract_event, calendar)
-
-
-class ReferenceImporter:
-    @staticmethod
-    def import_place_reference(reference_data : str):
-        """
-
-        Not create duplicates
-        """
-
-        json_data = json.loads(reference_data)
-
-        places_to_create = []
-        already_read_places = []
-
-        for place in json_data["places"]:
-            normalized_place = Utilities.normalize_place_repr(place)
-
-            if normalized_place in already_read_places or ReadAPI.is_place_already_exists(*normalized_place):
-                continue
-
-            places_to_create.append(
-                EventPlace(
-                    building=normalized_place[0],
-                    room=normalized_place[1]
-                )
-            )
-            
-            already_read_places.append(normalized_place)
-
-        if places_to_create:
-            EventPlace.objects.bulk_create(places_to_create)
-
-    @staticmethod
-    def import_subject_reference(reference_data : str):
-        """
-
-        Not create duplicates
-        """
-
-        json_data = json.loads(reference_data)
-
-        subjects_to_create = []
-        already_read_subjects = []
-
-        for entry in json_data:
-            subject = entry["discipline_name"]
-            
-            if subject in already_read_subjects or ReadAPI.is_subject_already_exists(subject):
-                continue
-
-            subjects_to_create.append(
-                Subject(name=subject)
-            )
-            
-            already_read_subjects.append(subject)
-        
-        if subjects_to_create:
-            Subject.objects.bulk_create(subjects_to_create)
-
-    @staticmethod
-    def import_faculty_reference(reference_data : str):
-        """
-
-        Not create duplicates
-        """
-
-        json_data = json.loads(reference_data)
-
-        # TODO: looking baad
-        organization = Organization.objects.get(name="ВолгГТУ")
-        faculties_to_create = []
-        already_read_faculties = []
-
-        for entry in json_data:
-            department_name = entry["faculty_fullname"]
-            department_shortname = entry["faculty_shortname"]
-            department_code = entry["faculty_id"]
-
-            if (department_name, department_shortname, department_code) in already_read_faculties \
-                or ReadAPI.is_department_already_exists(department_name, department_shortname, department_code):
-                continue
-
-            faculties_to_create.append(
-                Department(
-                    name=department_name,
-                    shortname=department_shortname,
-                    code=department_code,
-                    parent_department=None,
-                    organization=organization
-                )
-            )
-
-            already_read_faculties.append((department_name, department_shortname, department_code))
-        
-        if faculties_to_create:
-            Department.objects.bulk_create(faculties_to_create)
-
-    @staticmethod
-    def import_department_reference(reference_data : str):
-        """
-
-        Creates Department even parent_department not found
-
-        Not create duplicates
-        """
-
-        json_data = json.loads(reference_data)
-
-        # TODO: looking baad
-        organization = Organization.objects.get(name="ВолгГТУ")
-        departments_to_create = []
-        already_read_departments = []
-
-        for entry in json_data:
-            department_name = entry["department_fullname"]
-            department_shortname = entry["department_shortname"]
-            department_code = entry["department_code"]
-
-            if (department_name, department_shortname, department_code) in already_read_departments \
-                or ReadAPI.is_department_already_exists(department_name, department_shortname, department_code):
-                continue
-
-            try:
-                parent_department = Department.objects.get(code=entry["faculty_id"])
-            except Department.DoesNotExist:
-                parent_department = None
-
-            departments_to_create.append(
-                Department(
-                    name=department_name,
-                    shortname=department_shortname,
-                    code=department_code,
-                    parent_department=parent_department,
-                    organization=organization
-                )
-            )
-
-            already_read_departments.append((department_name, department_shortname, department_code))
-        
-        if departments_to_create:
-            Department.objects.bulk_create(departments_to_create)
-
-    @staticmethod
-    def import_teacher_reference(reference_data : str):
-        """
-
-        Creates EventParticipant (teacher) even Department not found
-
-        Can create duplicates when teachers have same names (surname and name, patronymic abbreviations)
-        """
-
-        json_data = json.loads(reference_data)
-
-        teachers_to_create = []
-
-        for entry in json_data:
-            try:
-                department = Department.objects.get(code=entry["staff_department_code"])
-            except Department.DoesNotExist:
-                department = None
-
-            teachers_to_create.append(
-                EventParticipant(
-                    name=Utilities.format_participant_name(
-                        entry["staff_surname"], 
-                        entry["staff_name"], 
-                        entry["staff_patronymic"]
-                    ),
-                    role=EventParticipant.Role.TEACHER, ## TODO: assistant
-                    is_group=False,
-                    department=department
-                )
-            )
-        
-        if teachers_to_create:
-            EventParticipant.objects.bulk_create(teachers_to_create)
-
-    @staticmethod
-    def import_student_reference(reference_data : str):
-        """
-
-        Creates EventParticipant (student) even Department not found
-
-        Not create duplicates
-        """
-        
-        json_data = json.loads(reference_data)
-
-        students_to_create = []
-        already_read_students = []
-
-        for entry in json_data:
-            try:
-                department = Department.objects.get(code=entry["faculty_id"])
-            except Department.DoesNotExist:
-                department = None
-
-            student_name = entry["group_name"]
-
-            if student_name in already_read_students or ReadAPI.is_participant_already_exists(student_name, department):
-                continue
-
-            students_to_create.append(
-                EventParticipant(
-                    name=student_name,
-                    role=EventParticipant.Role.STUDENT,
-                    is_group=True,
-                    department=department
-                )
-            )
-            already_read_students.append(student_name)
-        
-        if students_to_create:
-            EventParticipant.objects.bulk_create(students_to_create)
-
-    @staticmethod
-    def import_schedule(reference_data : str, save_archive_schedules : bool):
-        json_data = json.loads(reference_data)
-
-        for entry in json_data:
-            scope_value = Utilities.get_scope_value(entry["scope"])
-
-            if not scope_value:
-                raise ValueError(f"Степень обучения '{entry["scope"]}' не найдена.")
-            
-            try:
-                schedule_template_metadata = ScheduleTemplateMetadata.objects.get(
-                    faculty=entry["schedule_template_metadata_faculty_shortname"],
-                    scope=scope_value
-                )
-            except ScheduleTemplateMetadata.DoesNotExist:
-                schedule_template_metadata = ScheduleTemplateMetadata.objects.create(
-                    faculty=entry["schedule_template_metadata_faculty_shortname"],
-                    scope=scope_value
-                )
-
-            try:
-                department_ = Department.objects.get(shortname=entry["department_shortname"])
-            except Department.DoesNotExist:
-                raise Department.DoesNotExist(f"Подразделение '{entry["department_shortname"]}' не найдено.")
-            
-            try:
-                schedule_template = ScheduleTemplate.objects.get(
-                    metadata=schedule_template_metadata,
-                    department=department_
-                )
-            except ScheduleTemplate.DoesNotExist:
-                schedule_template = ScheduleTemplate.objects.create(
-                    metadata=schedule_template_metadata,
-                    repetition_period=14,
-                    repeatable=True,
-                    aligned_by_week_day=1,
-                    department=department_
-                )            
-
-            try:
-                schedule_metadata = ScheduleMetadata.objects.get(
-                    years=entry["years"],
-                    course=entry["course"],
-                    semester=entry["semester"]
-                )
-            except ScheduleMetadata.DoesNotExist:
-                schedule_metadata = ScheduleMetadata.objects.create(
-                    years=entry["years"],
-                    course=entry["course"],
-                    semester=entry["semester"]
-                )
-
-            try:
-                if not save_archive_schedules:
-                    Schedule.objects.filter(
-                        metadata=schedule_metadata,
-                        schedule_template=schedule_template,
-                        status=Schedule.Status.ARCHIVE
-                    ).delete()
-            except Schedule.DoesNotExist:
-                pass
-
-            try:
-                existing_schedule = Schedule.objects.get(
-                    metadata=schedule_metadata,
-                    schedule_template=schedule_template,
-                    status=Schedule.Status.ACTIVE
-                )
-
-                existing_schedule.status = Schedule.Status.ARCHIVE
-                existing_schedule.save()
-            except Schedule.DoesNotExist:
-                pass
-
-            Schedule.objects.create(
-                metadata=schedule_metadata,
-                status=Schedule.Status.ACTIVE,
-                start_date=datetime.strptime(entry["start_date"], "%d.%m.%Y"),
-                end_date=datetime.strptime(entry["end_date"], "%d.%m.%Y"),
-                starting_day_number=AbstractDay.objects.get(day_number=0),
-                schedule_template=schedule_template
-            )
+                fill_semester_for_dates(created_abstract_event, calendar)

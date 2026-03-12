@@ -2,25 +2,27 @@ from datetime import datetime
 
 from django.test import TestCase
 
-from apps.common.services.importers import ReferenceImporter
-from apps.common.services.utilities import WriteAPI
 from apps.common.models import (
-    Schedule,
-    ScheduleTemplate,
-    ScheduleMetadata,
-    ScheduleTemplateMetadata,
-    EventParticipant,
-    Department,
-    Organization,
     AbstractDay,
-    TimeSlot,
     AbstractEvent,
+    Department,
     Event,
+    EventKind,
+    EventParticipant,
     EventPlace,
+    Organization,
+    Schedule,
+    ScheduleMetadata,
+    ScheduleTemplate,
+    ScheduleTemplateMetadata,
     Subject,
-    EventKind
+    TimeSlot,
 )
-
+from apps.common.services.timetable.load.reference_importer import ReferenceImporter
+from apps.common.services.timetable.utilities.model_helpers import (
+    create_common_abstract_days,
+    create_common_time_slots,
+)
 
 """python manage.py test apps.client.tests.test_logic
 """
@@ -65,8 +67,8 @@ class TestLogic(TestCase):
             ]
         """
 
-        WriteAPI.create_common_abstract_days()
-        WriteAPI.create_common_time_slots()
+        create_common_abstract_days()
+        create_common_time_slots()
         Organization.objects.create(name="ВолгГТУ")
         ReferenceImporter.import_faculty_reference(FACULTY_REFERENCE_DATA)
         ReferenceImporter.import_department_reference(DEPARTMENT_REFERENCE_DATA)

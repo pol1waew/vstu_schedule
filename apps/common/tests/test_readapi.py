@@ -2,25 +2,29 @@ from datetime import datetime
 
 from django.test import TestCase
 
-from apps.common.services.importers import ReferenceImporter
-from apps.common.services.utilities import WriteAPI, ReadAPI
 from apps.common.models import (
-    Schedule,
-    ScheduleTemplate,
-    ScheduleMetadata,
-    ScheduleTemplateMetadata,
-    EventParticipant,
-    Department,
-    Organization,
     AbstractDay,
-    TimeSlot,
     AbstractEvent,
+    Department,
     Event,
+    EventKind,
+    EventParticipant,
     EventPlace,
+    Organization,
+    Schedule,
+    ScheduleMetadata,
+    ScheduleTemplate,
+    ScheduleTemplateMetadata,
     Subject,
-    EventKind
+    TimeSlot,
 )
-
+from apps.common.services.timetable.load.reference_importer import ReferenceImporter
+from apps.common.services.timetable.utilities.model_helpers import (
+    create_common_abstract_days,
+    create_common_time_slots,
+    is_abstract_event_already_exists,
+)
+from apps.common.services.timetable.write.factories import create_abstract_event
 
 """python manage.py test apps.common.tests.test_readapi
 """
@@ -53,8 +57,8 @@ class TestReadAPI(TestCase):
             ]
         """
 
-        WriteAPI.create_common_abstract_days()
-        WriteAPI.create_common_time_slots()
+        create_common_abstract_days()
+        create_common_time_slots()
         Organization.objects.create(name="ВолгГТУ")
         ReferenceImporter.import_faculty_reference(FACULTY_REFERENCE_DATA)
         ReferenceImporter.import_schedule(SCHEDULE_REFERENCE_DATA, True)
@@ -103,21 +107,21 @@ class TestReadAPI(TestCase):
             metadata__semester=2
         )
 
-        WriteAPI.create_abstract_event(
+        create_abstract_event(
             KIND, SUBJECT, PARTICIPANTS, PLACES, ABSTRACT_DAY, TIME_SLOT, None, SCHEDULE
         )
-        WriteAPI.create_abstract_event(
+        create_abstract_event(
             KIND, SUBJECT, PARTICIPANTS, PLACES, ABSTRACT_DAY, TIME_SLOT, DATE_, SCHEDULE
         )
 
         self.assertEqual(
-            ReadAPI.is_abstract_event_already_exists(
+            is_abstract_event_already_exists(
                 KIND, SUBJECT, PARTICIPANTS, PLACES, ABSTRACT_DAY, TIME_SLOT, DATE_, SCHEDULE
             ),
             True
         )
         self.assertEqual(
-            ReadAPI.is_abstract_event_already_exists(
+            is_abstract_event_already_exists(
                 KIND, SUBJECT, PARTICIPANTS, PLACES, ABSTRACT_DAY, TIME_SLOT, None, SCHEDULE
             ),
             True
@@ -131,7 +135,7 @@ class TestReadAPI(TestCase):
         )
 
         self.assertEqual(
-            ReadAPI.is_abstract_event_already_exists(
+            is_abstract_event_already_exists(
                 KIND, SUBJECT, [OTHER_PARTICIPANT], PLACES, ABSTRACT_DAY, TIME_SLOT, None, SCHEDULE
             ),
             False

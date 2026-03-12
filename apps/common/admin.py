@@ -1,33 +1,50 @@
 from django.contrib import admin, messages
-from django.utils import timezone
-from django.urls import path
-from django.http import HttpResponseRedirect
 from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
-# TODO: django.core.exceptions.ImproperlyConfigured: The model TokenProxy is abstract, so it cannot be registered with admin.
-##from rest_framework.authtoken.admin import TokenAdmin 
+from django.http import HttpResponseRedirect
+from django.urls import path
+from django.utils import timezone
 
-from apps.common.services.utilities import Utilities, ReadAPI, WriteAPI, EventImportAPI
-import apps.common.services.utility_filters as filters
-from apps.common.services.importers import ReferenceImporter
 from apps.common.models import (
-    AbstractEvent,
     AbstractDay,
-    ScheduleTemplateMetadata,
-    ScheduleMetadata,
-    ScheduleTemplate,
-    Schedule,
+    AbstractEvent,
+    AbstractEventChanges,
+    DayDateOverride,
     Department,
-    Organization,
     Event,
+    EventCancel,
     EventKind,
     EventParticipant,
     EventPlace,
+    Organization,
+    Schedule,
+    ScheduleMetadata,
+    ScheduleTemplate,
+    ScheduleTemplateMetadata,
     Subject,
     TimeSlot,
-    DayDateOverride,
-    EventCancel,
-    AbstractEventChanges
 )
+from apps.common.selectors import Selector
+from apps.common.services.timetable.export.exporter import export_abstract_event_changes
+from apps.common.services.timetable.load.event_importer_legacy import (
+    EventImporterLegacy,
+)
+from apps.common.services.timetable.load.reference_importer import ReferenceImporter
+from apps.common.services.timetable.read.filters import (
+    DateFilter,
+    EventFilter,
+)
+from apps.common.services.timetable.utilities.model_helpers import (
+    create_common_abstract_days,
+    create_common_time_slots,
+)
+from apps.common.services.timetable.utilities.validators import check_abstract_event
+from apps.common.services.timetable.write.factories import (
+    apply_day_date_override,
+    rewrite_events,
+)
+
+# TODO: django.core.exceptions.ImproperlyConfigured: The model TokenProxy is abstract, so it cannot be registered with admin.
+##from rest_framework.authtoken.admin import TokenAdmin 
 
 
 class BaseAdmin(admin.ModelAdmin):
@@ -214,9 +231,9 @@ class EventAdmin(BaseAdmin):
 
         def queryset(self, request, queryset):
             if self.value() in self.OVERRIDEN_VALUES:
-                return queryset.filter(**filters.EventFilter.overriden())
+                return queryset.filter(**EventFilter.overriden())
             elif self.value() in self.NOT_OVERRIDEN_VALUES:
-                return queryset.filter(**filters.EventFilter.not_overriden())
+                return queryset.filter(**EventFilter.not_overriden())
             
             return queryset
 
@@ -253,7 +270,7 @@ class AbstractEventChangesAdmin(BaseAdmin):
         """Export XLS form given AbstractEventChanges
         """
         
-        response = WriteAPI.make_changes_file(queryset)
+        response = export_abstract_event_changes(queryset)
 
         messages.success(request, "Успешно экспортированы")
 
@@ -271,7 +288,7 @@ class AbstractEventChangesAdmin(BaseAdmin):
 
             return
 
-        response = WriteAPI.make_changes_file(changes)
+        response = export_abstract_event_changes(changes)
 
         messages.success(request, "Успешно экспортированы")
 
@@ -307,7 +324,7 @@ class AbstractEventAdmin(BaseAdmin):
     def import_event_data(self, request):
         if request.method == "POST" and request.FILES.get("selected_file"):
             ## TODO: when working with big files should use chunks() instead
-            EventImportAPI.import_event_data(request.FILES['selected_file'].read())
+            EventImporterLegacy.import_event_data(request.FILES['selected_file'].read())
             messages.success(request, f"Успешно произведён импорт из файла: \"{request.FILES['selected_file']}\"")
 
         return HttpResponseRedirect("../")
@@ -325,7 +342,7 @@ class AbstractEventAdmin(BaseAdmin):
         """Fills semester with Events from given AbstractEvents
         """
         
-        if WriteAPI.fill_event_table(queryset):
+        if rewrite_events(queryset):
             messages.success(request, "Успешно заполнено")
         else:
             messages.error(request, "Произошла ошибка")
@@ -338,7 +355,7 @@ class AbstractEventAdmin(BaseAdmin):
         is_any_warning_shown = False
 
         for ae in queryset:
-            is_double_usage_found, message = Utilities.check_abstract_event(ae)
+            is_double_usage_found, message = check_abstract_event(ae)
 
             if is_double_usage_found:
                 is_any_warning_shown = True
@@ -359,7 +376,7 @@ class AbstractDayAdmin(BaseAdmin):
         return [path("create_abstract_days/", self.create_abstract_days)] + super().get_urls()
 
     def create_abstract_days(self, request):
-        if WriteAPI.create_common_abstract_days():
+        if create_common_abstract_days():
             messages.success(request, "Стандарные абстрактные дни успешно созданы")
 
         return HttpResponseRedirect("../")
@@ -444,7 +461,7 @@ class TimeSlotAdmin(BaseAdmin):
         return [path("create_time_slots/", self.create_time_slots)] + super().get_urls()
 
     def create_time_slots(self, request):
-        if WriteAPI.create_common_time_slots():
+        if create_common_time_slots():
             messages.success(request, "Стандарные учебные часы успешно созданы")
 
         return HttpResponseRedirect("../")
@@ -462,16 +479,14 @@ class DayDateOverrideAdmin(BaseAdmin):
         """Applies selected DayDateOverrides
         """
         
-        import apps.common.services.utility_filters as filters
-
         for ddo in queryset:
-            reader = ReadAPI(filters.DateFilter.from_singe_date(ddo.day_source))
-            reader.add_filter(filters.EventFilter.by_department(ddo.department))
+            reader = Selector(DateFilter.from_singe_date(ddo.day_source))
+            reader.add_filter(EventFilter.by_department(ddo.department))
             
             reader.find_models(Event)
             
             for e in reader.get_found_models():
-                WriteAPI.apply_date_override(ddo, e)
+                apply_day_date_override(ddo, e)
 
         messages.success(request, "Успешно перенесены")
 

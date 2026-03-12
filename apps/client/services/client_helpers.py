@@ -1,14 +1,45 @@
 from collections import defaultdict
+from datetime import timedelta
 
-from apps.common.services.utilities import Utilities, ReadAPI, WriteAPI
-from apps.common.services.utility_filters import *
+from django.db.models import QuerySet
+
 from apps.common.models import Event
+from apps.common.selectors import Selector
+from apps.common.services.timetable.read.filters import (
+    DateFilter,
+    KindFilter,
+    ParticipantFilter,
+    PlaceFilter,
+    ScheduleFilter,
+    SubjectFilter,
+    TimeSlotFilter,
+)
+from apps.common.services.timetable.utilities.utilities import (
+    get_name_from_month_number,
+    is_events_follow_each_other,
+    is_similar_events,
+)
+from apps.common.services.timetable.write.abstract_event_manager import (
+    calculate_semester_filling_parameters,
+)
 
-def get_table_data(filters):
-    """Returns formated data ready to visualisation
+
+def make_table_data(filters : dict) -> list[
+        tuple[
+            list[Event], 
+            list[int], 
+            list[
+                tuple[
+                    list[str], 
+                    list[list[int|str]]
+                ]
+            ]
+        ]
+    ]:
+    """Used to get filtered and formated data ready to visualisation
     """
     
-    reader = ReadAPI()
+    reader = Selector()
     # Currently working ONLY with ACTIVE Schedules
     # TODO: selector for ARCHIVE and other Schdules 
     reader.add_filter(ScheduleFilter.is_active())
@@ -30,7 +61,7 @@ def get_table_data(filters):
         reader.add_filter(ParticipantFilter.by_name(filters["group"]))
 
     if filters["place"]:
-        reader.add_filter(PlaceFilter.by_repr_event_relative(filters["place"]))
+        reader.add_filter(PlaceFilter.by_building_and_room_event_relative(filters["place"]))
 
     if filters["subject"]:
         reader.add_filter(SubjectFilter.by_name(filters["subject"]))
@@ -39,7 +70,7 @@ def get_table_data(filters):
         reader.add_filter(KindFilter.by_name(filters["kind"]))
 
     if filters["time_slot"]:
-        reader.add_filter(TimeSlotFilter.by_repr_event_relative(filters["time_slot"]))
+        reader.add_filter(TimeSlotFilter.from_display_name_event_relative(filters["time_slot"]))
 
     reader.find_models(Event)
 
@@ -48,14 +79,12 @@ def get_table_data(filters):
     else:
         entries = format_events(reader.get_found_models())
 
-    row_spans = get_row_spans(entries)
-
-    calendar = get_calendar(entries)
+    row_spans = make_row_spans(entries)
+    calendar = make_calendar(entries)
 
     return list(zip(entries, row_spans, calendar))
 
-
-def format_events(events):
+def format_events(events : QuerySet) -> list[Event]:
     """Format events by grouping them and ordering by date
     """
     
@@ -75,21 +104,7 @@ def format_events(events):
 
     return ordered_grouped_events
 
-
-def is_same_entries(first_entry, second_entry):
-    """Checks is given entries are the same
-
-    Function compare some fields to make decision
-    """
-    
-    return abs(first_entry.time_slot_override.pk - second_entry.time_slot_override.pk) == 1 and \
-            first_entry.subject_override == second_entry.subject_override and \
-            list(first_entry.get_groups()) == list(second_entry.get_groups()) and \
-            list(first_entry.get_teachers()) == list(second_entry.get_teachers()) and \
-            list(first_entry.places_override.all()) == list(second_entry.places_override.all())
-
-
-def get_row_spans(entries):
+def make_row_spans(entries : list[Event]) -> list[int]:
     """Returns a list of table row spans
     """
     
@@ -112,7 +127,10 @@ def get_row_spans(entries):
                 row_spans[len(row_spans) - 1].append(1)
                 continue
 
-            if is_same_entries(entry[i], entry[i + 1]):
+            if (
+                is_events_follow_each_other(entry[i], entry[i + 1]) and 
+                is_similar_events(entry[i], entry[i + 1])
+            ):
                 row_spans[len(row_spans) - 1].append(2)
                 prev_event_expanded = True
             else:
@@ -120,13 +138,20 @@ def get_row_spans(entries):
 
     return row_spans
 
-
-def get_calendar(entries):
+def make_calendar(entries : list[Event]
+    ) -> list[tuple[list[str], list[list[int|str]]]]:
     """Makes and returns calendar for given entries
 
     Calendar format:
     [
-        [['Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь', 'Январь'], [[1, 13, 10, 8, 5], [15, 27, 24, 22, 19], [29, '', '', '', '']]]
+        [
+            ['Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь', 'Январь'], 
+            [
+                [1, 13, 10, 8, 5], 
+                [15, 27, 24, 22, 19], 
+                [29, '', '', '', '']
+            ]
+        ]
     ]
     """
     
@@ -136,11 +161,10 @@ def get_calendar(entries):
         months = []
         month_days = []
         dates = []
-        _, end_date, date, repetition_period = WriteAPI.get_semester_filling_parameters(entry[0].abstract_event)
-        print(WriteAPI.get_semester_filling_parameters(entry[0].abstract_event))
+        _, end_date, date, repetition_period = calculate_semester_filling_parameters(entry[0].abstract_event)
 
         while date < end_date:
-            if not date.month in months:
+            if date.month not in months:
                 months.append(date.month)
 
                 if dates:
@@ -156,7 +180,7 @@ def get_calendar(entries):
             dates = []
 
         calendar.append([])
-        calendar[len(calendar) - 1].append(Utilities.get_month_name(months))
+        calendar[len(calendar) - 1].append(get_name_from_month_number(months))
         calendar[len(calendar) - 1].append(format_days(month_days))
 
         # calendar can be builded from first event each day
@@ -164,8 +188,7 @@ def get_calendar(entries):
 
     return calendar
 
-
-def format_days(days : list):
+def format_days(days : list[list[int]]) -> list[list[int|str]]:
     """Transforms days order from column into row oriented
     """
     
@@ -187,19 +210,3 @@ def format_days(days : list):
         formated_days.append(row)
 
     return formated_days
-
-
-def get_POST_value(POST, name):
-    """Returns POST value by represented name
-    """
-    
-    value = ""
-
-    if name in POST:
-        value = POST.getlist(name)
-
-        # converts single value array into value
-        if type(value) is list and len(value) == 1:
-            value = value[0]
-
-    return value

@@ -2,15 +2,16 @@ import re
 from datetime import date, timedelta
 
 from apps.common.models import (
-    Schedule,
-    EventParticipant,
     AbstractDay,
-    TimeSlot,
     Event,
+    EventKind,
+    EventParticipant,
     EventPlace,
+    Schedule,
     Subject,
-    EventKind
+    TimeSlot,
 )
+from apps.common.services.timetable.utilities.normalizers import normalize_place_building_and_room
 
 
 class UtilityFilterBase:
@@ -97,15 +98,15 @@ class ParticipantFilter(UtilityFilterBase):
 
 class PlaceFilter(UtilityFilterBase):
     @classmethod
-    def by_repr_event_relative(cls, repr : str|list[str]):
+    def by_building_and_room_event_relative(cls, building_and_room : str|list[str]):
         """Only for work with Event model fields
 
-        Use list of places repr for OR behaviour
+        Use list of places for OR behaviour
 
-        repr must be in format: "{building} {room}" (separated by space)
+        building_and_room must be in format: "{building} {room}" (separated by space)
         """
 
-        filter_ = cls.by_repr(repr)
+        filter_ = cls.by_building_and_room(building_and_room)
 
         for key in list(filter_.keys()):
             filter_["places_override__{}".format(key)] = filter_.pop(key)
@@ -113,24 +114,22 @@ class PlaceFilter(UtilityFilterBase):
         return filter_
 
     @classmethod
-    def by_repr(cls, repr : str|list[str]):
+    def by_building_and_room(cls, building_and_room : str|list[str]):
         """
 
-        Use list of places repr for OR behaviour
+        Use list of places for OR behaviour
 
-        repr must be in format: "{building} {room}" (separated by space)
+        building_and_room must be in format: "{building} {room}" (separated by space)
         """
-
-        from apps.common.services.utilities import Utilities
 
         fitler_ = {}
 
-        if type(repr) is list:
+        if type(building_and_room) is list:
             buildings = []
             rooms = []
             
-            for r in repr:
-                building, room = Utilities.normalize_place_repr(r)
+            for r in building_and_room:
+                building, room = normalize_place_building_and_room(r)
 
                 buildings.append(building)
                 rooms.append(room)
@@ -139,7 +138,7 @@ class PlaceFilter(UtilityFilterBase):
                 fitler_ = cls.by_building(buildings)
             fitler_.update(cls.by_room(rooms))
         else:
-            building, room = Utilities.normalize_place_repr(repr)
+            building, room = normalize_place_building_and_room(building_and_room)
             
             fitler_ = cls.by_building(building)
             fitler_.update(cls.by_room(room))
@@ -190,13 +189,13 @@ class SubjectFilter(UtilityFilterBase):
 
 class TimeSlotFilter(UtilityFilterBase):
     @classmethod
-    def by_repr_event_relative(cls, repr : str|list[str]):
-        """Only for work with Event model TimeSlot field.
+    def from_display_name_event_relative(cls, display_name : str|list[str]):
+        """Only for work with Event model TimeSlot field
 
-        Use list of time slots repr for OR behaviour
+        Use list of time slot display_names for OR behaviour
         """
 
-        filter_ = cls.by_repr(repr)
+        filter_ = cls.from_display_name(display_name)
 
         for key in list(filter_.keys()):
             filter_["time_slot_override__{}".format(key)] = filter_.pop(key)
@@ -204,13 +203,13 @@ class TimeSlotFilter(UtilityFilterBase):
         return filter_
     
     @classmethod
-    def by_repr_abstract_event_relative(cls, repr : str|list[str]):
-        """Only for work with AbstractEvent model TimeSlot field.
+    def from_display_name_abstract_event_relative(cls, display_name : str|list[str]):
+        """Only for work with AbstractEvent model TimeSlot field
 
-        Use list of time slots repr for OR behaviour
+        Use list of time slot display_names for OR behaviour
         """
 
-        filter_ = cls.by_repr(repr)
+        filter_ = cls.from_display_name(display_name)
 
         for key in list(filter_.keys()):
             filter_["time_slot__{}".format(key)] = filter_.pop(key)
@@ -218,32 +217,32 @@ class TimeSlotFilter(UtilityFilterBase):
         return filter_
 
     @classmethod
-    def by_repr(cls, repr : str|list[str]) -> dict|None:
+    def from_display_name(cls, display_name : str|list[str]) -> dict|None:
         """Gives filter query for TimeSlot by it start_time (firstly) OR alt_name (secondly)
 
-        Correctly works with repr in next formats:
+        Correctly works with string in next formats:
             \\d-\\d for alt name
             HH:MM for start time
             HH:MM HH:MM for start and end times
 
-        Use list of time slots repr for OR behaviour
+        Use list of time slot display_names for OR behaviour
 
-        Returns filter query for only one of start_time OR alt_name repr (!)
+        Returns filter query for only one of start_time string OR alt_name string (!)
 
-        Returns None when cannot create filter query from given repr
+        Returns None when cannot create filter query from given string
         """
 
         ## TODO: remove _
         # making query from start time should be first
         # to prevent problem in some situations
         # e.g. 8:30-10.00
-        filter_query_from_start_times, _ = cls.by_start_time(repr)
+        filter_query_from_start_times, _ = cls.by_start_time(display_name)
         
         if filter_query_from_start_times:
             return filter_query_from_start_times
         
         ## TODO: remove _
-        filter_query_from_alt_names, _ = cls.by_alt_name(repr)    
+        filter_query_from_alt_names, _ = cls.by_alt_name(display_name)    
 
         if filter_query_from_alt_names:
             return filter_query_from_alt_names

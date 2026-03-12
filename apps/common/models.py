@@ -3,8 +3,6 @@ from typing import Optional, Self
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models.signals import pre_save, post_save, pre_delete, m2m_changed
-from django.dispatch import receiver
 from django.urls import reverse
 
 
@@ -202,16 +200,17 @@ class ScheduleTemplate(CommonModel):
     def save(self, **kwargs):
         super().save(**kwargs)
         
-        from apps.common.services.utilities import WriteAPI, ReadAPI
-        import apps.common.services.utility_filters as filters
+        from apps.common.selectors import Selector
+        from apps.common.services.timetable.read.filters import AbstractEventFilter
+        from apps.common.services.timetable.write.factories import rewrite_events
 
-        reader = ReadAPI({"schedule__schedule_template" : self})
+        reader = Selector({"schedule__schedule_template" : self})
         # getting AbstractEvents with existing Events
-        reader.add_filter(filters.AbstractEventFilter.with_existing_events())
+        reader.add_filter(AbstractEventFilter.with_existing_events())
         
         reader.find_models(AbstractEvent)
 
-        WriteAPI.fill_event_table(reader.get_found_models())
+        rewrite_events(reader.get_found_models())
 
 
 class Schedule(CommonModel):
@@ -248,16 +247,17 @@ class Schedule(CommonModel):
     def save(self, **kwargs):
         super().save(**kwargs)
         
-        from apps.common.services.utilities import WriteAPI, ReadAPI
-        import apps.common.services.utility_filters as filters
+        from apps.common.selectors import Selector
+        from apps.common.services.timetable.read.filters import AbstractEventFilter
+        from apps.common.services.timetable.write.factories import rewrite_events
 
-        reader = ReadAPI({"schedule" : self})
+        reader = Selector({"schedule" : self})
         # getting AbstractEvent with existing Event
-        reader.add_filter(filters.AbstractEventFilter.with_existing_events())
+        reader.add_filter(AbstractEventFilter.with_existing_events())
         
         reader.find_models(AbstractEvent)
 
-        WriteAPI.fill_event_table(reader.get_found_models())
+        rewrite_events(reader.get_found_models())
 
 
 class EventParticipant(CommonModel):
@@ -377,7 +377,7 @@ class AbstractEventChanges(CommonModel):
         self.origin_holds_on_date = ae.holds_on_date
         self.origin_kind = ae.kind.name if ae.kind else ""
 
-    def export(self) -> list[list[str]]:
+    def get_export_data(self) -> list[list[str]]:
         """Prepare stored data to export
         """
         
@@ -413,7 +413,7 @@ class AbstractEventChanges(CommonModel):
 
         return export_data
     
-    def clear_relation_with_abs_event(self):
+    def clear_relation_with_abs_event(self) -> None:
         """Removes all references to self from related AbstractEvents
         """
         
@@ -445,10 +445,12 @@ class AbstractEvent(CommonModel):
     def save(self, **kwargs):
         super().save(**kwargs)
 
-        from apps.common.services.utilities import WriteAPI
+        from apps.common.services.timetable.write.abstract_event_manager import (
+            refresh_related_events,
+        )
 
-        # calling here because need updated AbstractEvent reference inside Events
-        WriteAPI.update_events(self, update_m2m=False)
+        # Calling here because need updated AbstractEvent reference inside Events
+        refresh_related_events(self, update_m2m=False)
     
     @property
     def department(self):
@@ -532,87 +534,6 @@ class AbstractEvent(CommonModel):
         changes.save()
 
         self.changes = changes
-
-@receiver(m2m_changed, sender=AbstractEvent.participants.through)
-def participants_changed(sender, instance, action, reverse, model, pk_set, **kwargs):
-    """Writes AbstractEvent participants changes and update related Events
-    """
-
-    if action == "pre_add" or action == "pre_remove":
-        if not instance.changes:
-            changes = AbstractEventChanges()
-
-            changes.initialize(instance)
-
-            changes.save()
-
-            instance.changes = changes
-
-            instance.save()
-    elif action == "post_add" or action == "post_remove":
-        from apps.common.services.utilities import WriteAPI
-
-        WriteAPI.update_events(instance, update_non_m2m=False)
-
-        instance.changes.group = AbstractEventChanges.str_from_participants(instance.get_groups())
-        instance.changes.final_teachers = AbstractEventChanges.str_from_participants(instance.get_teachers())
-
-        instance.changes.save()
-
-@receiver(m2m_changed, sender=AbstractEvent.places.through)
-def places_changed(sender, instance, action, reverse, model, pk_set, **kwargs):
-    """Writes AbstractEvent places changes and update related Events
-    """
-
-    if action == "pre_add" or action == "pre_remove":
-        if not instance.changes:
-            changes = AbstractEventChanges()
-
-            changes.initialize(instance)
-
-            changes.save()
-
-            instance.changes = changes
-
-            instance.save()
-    elif action == "post_add" or action == "post_remove":
-        from apps.common.services.utilities import WriteAPI
-
-        WriteAPI.update_events(instance, update_non_m2m=False)
-        
-        instance.changes.final_places = AbstractEventChanges.str_from_places(instance.places.all())
-
-        instance.changes.save()
-
-@receiver(pre_save, sender=AbstractEvent)
-def on_abstract_event_pre_save(sender, instance, **kwargs):
-    # AbsEvent created
-    if instance.pk is None:
-        instance.generate_changes_on_creating()
-
-        return
-
-    instance.update_change_model()
-
-    if AbstractEvent.objects.get(pk=instance.pk).abstract_day != instance.abstract_day:
-        from apps.common.services.utilities import WriteAPI
-
-        WriteAPI.fill_event_table(instance)
-
-@receiver(pre_delete, sender=AbstractEvent)
-def on_abstract_event_delete(sender, instance, **kwargs): 
-    if instance.changes and instance.changes.is_created and not instance.changes.is_exported:
-        instance.changes.delete()
-        
-        return
-
-    changes = AbstractEventChanges()
-
-    changes.initialize(instance)
-
-    changes.is_deleted = True
-
-    changes.save()
             
 
 class EventCancel(CommonModel):
@@ -629,48 +550,20 @@ class EventCancel(CommonModel):
     def save(self, **kwargs):
         super().save(**kwargs)
         
-        from apps.common.services.utilities import WriteAPI, ReadAPI
-        import apps.common.services.utility_filters as filters
+        from apps.common.selectors import Selector
+        from apps.common.services.timetable.read.filters import (
+            DateFilter,
+            EventFilter,
+        )
+        from apps.common.services.timetable.write.factories import apply_event_cancel
 
-        reader = ReadAPI(filters.DateFilter.from_singe_date(self.date))
-        reader.add_filter(filters.EventFilter.by_department(self.department))
+        reader = Selector(DateFilter.from_singe_date(self.date))
+        reader.add_filter(EventFilter.by_department(self.department))
         
         reader.find_models(Event)
         
         for e in reader.get_found_models():
-            WriteAPI.apply_event_canceling(self, e)
-
-@receiver(pre_save, sender=EventCancel)
-def on_event_cancel_date_override(sender, instance, **kwargs):
-    created = instance.pk is None
-
-    if created:
-        return
-    
-    previous_cancel = EventCancel.objects.get(pk=instance.pk)
-
-    # if EventCancel moved to other date
-    # need to undo Events canceling
-    if previous_cancel.date != instance.date:
-        from apps.common.services.utilities import WriteAPI, ReadAPI
-
-        reader = ReadAPI({"event_cancel" : previous_cancel})
-        
-        reader.find_models(Event)
-        
-        for e in reader.get_found_models():
-            WriteAPI.apply_event_canceling(None, e)
-
-@receiver(pre_delete, sender=EventCancel)
-def on_event_cancel_delete(sender, instance, **kwargs):
-    from apps.common.services.utilities import WriteAPI, ReadAPI
-
-    reader = ReadAPI({"event_cancel" : instance})
-    
-    reader.find_models(Event)
-    
-    for e in reader.get_found_models():
-        WriteAPI.apply_event_canceling(None, e)
+            apply_event_cancel(self, e)
 
 
 class DayDateOverride(CommonModel):
@@ -688,48 +581,22 @@ class DayDateOverride(CommonModel):
     def save(self, **kwargs):
         super().save(**kwargs)
 
-        from apps.common.services.utilities import WriteAPI, ReadAPI
-        import apps.common.services.utility_filters as filters
+        from apps.common.selectors import Selector
+        from apps.common.services.timetable.read.filters import (
+            DateFilter,
+            EventFilter,
+        )
+        from apps.common.services.timetable.write.factories import (
+            apply_day_date_override,
+        )
 
-        reader = ReadAPI(filters.DateFilter.from_singe_date(self.day_source))
-        reader.add_filter(filters.EventFilter.by_department(self.department))
+        reader = Selector(DateFilter.from_singe_date(self.day_source))
+        reader.add_filter(EventFilter.by_department(self.department))
         
         reader.find_models(Event)
         
         for e in reader.get_found_models():
-            WriteAPI.apply_date_override(self, e)
-
-@receiver(pre_save, sender=DayDateOverride)
-def on_date_override_source_override(sender, instance, **kwargs):
-    created = instance.pk is None
-
-    if created:
-        return
-    
-    previous_override = DayDateOverride.objects.get(pk=instance.pk)
-
-    # if DayDateOverride moved to other date
-    # need to detach it from Events
-    if previous_override.day_source != instance.day_source:
-        from apps.common.services.utilities import WriteAPI, ReadAPI
-
-        reader = ReadAPI({"date_override" : previous_override})
-        
-        reader.find_models(Event)
-
-        for e in reader.get_found_models():
-            WriteAPI.apply_date_override(None, e)
-
-@receiver(pre_delete, sender=DayDateOverride)
-def on_day_date_override_delete(sender, instance, **kwargs):
-    from apps.common.services.utilities import WriteAPI, ReadAPI
-
-    reader = ReadAPI({"date_override" : instance})
-        
-    reader.find_models(Event)
-    
-    for e in reader.get_found_models():
-            WriteAPI.apply_date_override(None, e)
+            apply_day_date_override(self, e)
 
 
 class Event(CommonModel):
@@ -767,15 +634,18 @@ class Event(CommonModel):
         """
 
         if not self.date_override:
-            from apps.common.services.utilities import WriteAPI, ReadAPI
+            from apps.common.selectors import Selector
+            from apps.common.services.timetable.write.factories import (
+                apply_day_date_override,
+            )
 
-            reader = ReadAPI({"day_source" : self.date})
+            reader = Selector({"day_source" : self.date})
             reader.add_filter({"department" : self.department})
 
             reader.find_models(DayDateOverride)
 
             if reader.get_found_models().exists():
-                WriteAPI.apply_date_override(reader.get_found_models().first(), self, call_save_method=False)
+                apply_day_date_override(reader.get_found_models().first(), self, call_save_method=False)
 
             return
 
@@ -793,62 +663,17 @@ class Event(CommonModel):
         if self.is_event_canceled and not self.event_cancel:
             return
 
-        from apps.common.services.utilities import WriteAPI, ReadAPI
-        import apps.common.services.utility_filters as filters
+        from apps.common.selectors import Selector
+        from apps.common.services.timetable.read.filters import DateFilter
+        from apps.common.services.timetable.write.factories import apply_event_cancel
 
-        reader = ReadAPI({"department" : self.department})
-        reader.add_filter(filters.DateFilter.from_singe_date(self.date))
+        reader = Selector({"department" : self.department})
+        reader.add_filter(DateFilter.from_singe_date(self.date))
 
         reader.find_models(EventCancel)
 
         if reader.get_found_models().exists():
-            WriteAPI.apply_event_canceling(reader.get_found_models().first(), self, False)
+            apply_event_cancel(reader.get_found_models().first(), self, False)
         else:
             self.is_event_canceled = False
             self.event_cancel = None
-        
-
-@receiver(m2m_changed, sender=Event.participants_override.through)
-def participants_override_changed(sender, instance, action, reverse, model, pk_set, **kwargs):
-    if action == "post_add" or action == "post_remove":
-        if not instance.is_event_overriden and list(instance.participants_override.all()) != list(instance.abstract_event.participants.all()):
-            instance.is_event_overriden = True
-
-            instance.save()
-
-@receiver(m2m_changed, sender=Event.places_override.through)
-def places_override_changed(sender, instance, action, reverse, model, pk_set, **kwargs):
-    if action == "post_add" or action == "post_remove":
-        if not instance.is_event_overriden and list(instance.places_override.all()) != list(instance.abstract_event.places.all()):
-            instance.is_event_overriden = True
-
-            instance.save()
-
-@receiver(pre_save, sender=Event)
-def on_event_save(sender, instance, **kwargs):
-    created = instance.pk is None
-    previous_event = None
-
-    if not created:
-        previous_event = Event.objects.get(pk=instance.pk)
-
-        # check for override by non m2m fields
-        if not instance.is_event_overriden:
-            if instance.kind_override != instance.abstract_event.kind or \
-                instance.subject_override != instance.abstract_event.subject or \
-                instance.time_slot_override != instance.abstract_event.time_slot or \
-                instance.is_event_canceled and not instance.event_cancel:
-                instance.is_event_overriden = True
-
-    instance.check_date_interactions()
-            
-    # if Event was created or date changed
-    # need to check for event canceling
-    if created or previous_event.date != instance.date:
-        instance.check_canceling()
-        
-    # if EventCancel was manualy setted in Event
-    # but is_event_canceled not checked
-    # make Event canceled
-    if not created and not instance.is_event_canceled and not previous_event.event_cancel and instance.event_cancel:
-        instance.is_event_canceled = True

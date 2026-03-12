@@ -3,26 +3,32 @@ from datetime import datetime
 
 from django.test import TestCase
 
-from apps.common.services.importers import EventImporter, ReferenceImporter
-from apps.common.services.utilities import WriteAPI, EventImportAPI
-from apps.common.services.utility_filters import TimeSlotFilter, PlaceFilter
 from apps.common.models import (
-    Schedule,
-    ScheduleTemplate,
-    ScheduleMetadata,
-    ScheduleTemplateMetadata,
-    EventParticipant,
-    Department,
-    Organization,
     AbstractDay,
-    TimeSlot,
     AbstractEvent,
+    Department,
     Event,
+    EventKind,
+    EventParticipant,
     EventPlace,
+    Organization,
+    Schedule,
+    ScheduleMetadata,
+    ScheduleTemplate,
+    ScheduleTemplateMetadata,
     Subject,
-    EventKind
+    TimeSlot,
 )
-
+from apps.common.services.timetable.load.event_importer import EventImporter
+from apps.common.services.timetable.load.reference_importer import ReferenceImporter
+from apps.common.services.timetable.read.filters import (
+    PlaceFilter,
+    TimeSlotFilter,
+)
+from apps.common.services.timetable.utilities.model_helpers import (
+    create_common_abstract_days,
+    create_common_time_slots,
+)
 
 """python manage.py test apps.common.tests.test_import
 """
@@ -81,8 +87,8 @@ class TestEventImporter(TestCase):
     """
     
     def setUp(self):
-        WriteAPI.create_common_abstract_days()
-        WriteAPI.create_common_time_slots()
+        create_common_abstract_days()
+        create_common_time_slots()
         Organization.objects.create(name="ВолгГТУ")
         ReferenceImporter.import_faculty_reference(self.FACULTY_REFERENCE_DATA)
         ReferenceImporter.import_schedule(self.SCHEDULE_REFERENCE_DATA, True)
@@ -930,19 +936,19 @@ class TestEventImporter(TestCase):
             EventImporter.make_reference_lookup(reference_data, reference_lookup)
             EventImporter.make_reference_lookup(reference_data, reference_lookup)
 
-        print(reference_data)
-        print(reference_lookup)
-        print(EventParticipant.objects.all())
+        # print(reference_data)
+        # print(reference_lookup)
+        # print(EventParticipant.objects.all())
 
     def test_2(self):
         from django.db.models.functions import Lower
         EventKind.objects.create(name="QWE-166")
 
-        try:
-            print(EventKind.objects.annotate(lower_name=Lower("name")).filter(lower_name="qwe-166").all())
+        # try:
+            # print(EventKind.objects.annotate(lower_name=Lower("name")).filter(lower_name="qwe-166").all())
             
-        except EventKind.DoesNotExist:
-            print("ничего не найдено")
+        # except EventKind.DoesNotExist:
+            # print("ничего не найдено")
 
     """
 
@@ -1119,11 +1125,11 @@ class TestReferenceImporter(TestCase):
         ReferenceImporter.import_place_reference(PLACE_REFERENCE_DATA)
 
         try:
-            self.assertNotEqual(EventPlace.objects.get(**PlaceFilter.by_repr("002")), None)
-            self.assertNotEqual(EventPlace.objects.get(**PlaceFilter.by_repr("КЦ УНЦ")), None)
-            self.assertNotEqual(EventPlace.objects.get(**PlaceFilter.by_repr("В-1402-3")), None)
-            self.assertNotEqual(EventPlace.objects.get(**PlaceFilter.by_repr("Б-205а")), None)
-            self.assertNotEqual(EventPlace.objects.get(**PlaceFilter.by_repr("ГУК101")), None)
+            self.assertNotEqual(EventPlace.objects.get(**PlaceFilter.by_building_and_room("002")), None)
+            self.assertNotEqual(EventPlace.objects.get(**PlaceFilter.by_building_and_room("КЦ УНЦ")), None)
+            self.assertNotEqual(EventPlace.objects.get(**PlaceFilter.by_building_and_room("В-1402-3")), None)
+            self.assertNotEqual(EventPlace.objects.get(**PlaceFilter.by_building_and_room("Б-205а")), None)
+            self.assertNotEqual(EventPlace.objects.get(**PlaceFilter.by_building_and_room("ГУК101")), None)
         except EventPlace.DoesNotExist:
             self.fail()
 
@@ -1698,7 +1704,7 @@ class TestReferenceImporter(TestCase):
         """
 
         Organization.objects.create(name="ВолгГТУ")
-        if not WriteAPI.create_common_abstract_days():
+        if not create_common_abstract_days():
             self.fail()
 
         ReferenceImporter.import_faculty_reference(FACULTY_REFERENCE_DATA)
@@ -1922,7 +1928,7 @@ class TestReferenceImporter(TestCase):
         """
 
         Organization.objects.create(name="ВолгГТУ")
-        if not WriteAPI.create_common_abstract_days():
+        if not create_common_abstract_days():
             self.fail()
 
         ReferenceImporter.import_faculty_reference(FACULTY_REFERENCE_DATA)
