@@ -78,7 +78,7 @@ def get_name_from_month_number(month_number : int|list[int]) -> str|None|list[st
 
     return MONTH_NAMES[month_number - 1] if month_number >= 1 and month_number <= 12 else None 
 
-def get_scope_from_label(cls, scope_label : str) -> ScheduleTemplateMetadata.Scope|None:
+def get_scope_from_label(scope_label : str) -> ScheduleTemplateMetadata.Scope|None:
         SCOPES_REG_EXS = [
             (ScheduleTemplateMetadata.Scope.BACHELOR, r"(([бБ]акалавр)[а-яА-ЯёЁ]*)"),
             (ScheduleTemplateMetadata.Scope.MASTER, r"(([мМ]агистр)[а-яА-ЯёЁ]*)"),

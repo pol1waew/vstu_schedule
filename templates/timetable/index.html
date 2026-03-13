@@ -12,17 +12,17 @@
     </head>
 
     <body>
-        {% include "client/header.html" %}
+        {% include "timetable/header.html" %}
 
         {% if request.method == "GET" %}
-            {% include "client/welcome.html" %}
+            {% include "timetable/welcome.html" %}
         {% elif request.method == "POST" %}
             {% if data|length == 0 %}
-                {% include "client/emptyTable.html" %}
+                {% include "timetable/emptyTable.html" %}
             {% else %}
-                {% include "client/table.html" %}    
+                {% include "timetable/table.html" %}    
                 
-                {% include "client/footer.html" %}
+                {% include "timetable/footer.html" %}
             {% endif %}
         {% endif %}
     </body>
