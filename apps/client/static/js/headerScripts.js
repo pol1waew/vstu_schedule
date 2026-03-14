@@ -1,93 +1,44 @@
 document.addEventListener("DOMContentLoaded", function() {
-    const multiple_pillbox_width = "15%";
-    const no_results_text = "Ничего не найдено";
-    
-    $(document).ready(function() {
-        $(".date-select").select2({
+    initSelect2Element(
+        ".date-select",
+        {
             placeholder : "Дата",
             allowClear : false,
+            closeOnSelect : true,
             width : "100%",
-            minimumResultsForSearch : Infinity
-        });
-    });
+            minimumResultsForSearch : Infinity,
+        }
+    );
 
-    $(document).ready(function() {
-        $(".group-pillbox").select2({
-            placeholder : "Группа",
-            allowClear : true,
-            width : multiple_pillbox_width,
-            closeOnSelect : false,
-            "language": {
-                "noResults": function() { return no_results_text; }
-            },
-            escapeMarkup: function (markup) { return markup; }
-        });
-    });
+    initSelect2Element(
+        ".group-pillbox",
+        { placeholder : "Группа"}
+    );
 
-    $(document).ready(function() {
-        $(".teacher-pillbox").select2({
-            placeholder : "Преподаватель",
-            allowClear : true,
-            width : multiple_pillbox_width,
-            closeOnSelect : false,
-            "language": {
-                "noResults": function() { return no_results_text; }
-            },
-            escapeMarkup: function (markup) { return markup; }
-        });
-    });
+    initSelect2Element(
+        ".teacher-pillbox",
+        { placeholder : "Преподаватель" }
+    );
 
-    $(document).ready(function() {
-        $(".place-pillbox").select2({
-            placeholder : "Аудитория",
-            allowClear : true,
-            width : multiple_pillbox_width,
-            closeOnSelect : false,
-            "language": {
-                "noResults": function() { return no_results_text; }
-            },
-            escapeMarkup: function (markup) { return markup; }
-        });
-    });
+    initSelect2Element(
+        ".place-pillbox",
+        { placeholder : "Аудитория" }
+    );
 
-    $(document).ready(function() {
-        $(".subject-pillbox").select2({
-            placeholder : "Предмет",
-            allowClear : true,
-            width : multiple_pillbox_width,
-            closeOnSelect : false,
-            "language": {
-                "noResults": function() { return no_results_text; }
-            },
-            escapeMarkup: function (markup) { return markup; }
-        });
-    });
+    initSelect2Element(
+        ".subject-pillbox",
+        { placeholder : "Предмет" }
+    );
+    
+    initSelect2Element(
+        ".kind-pillbox",
+        { placeholder : "Тип предмета" }
+    );
 
-    $(document).ready(function() {
-        $(".kind-pillbox").select2({
-            placeholder : "Тип предмета",
-            allowClear : true,
-            width : multiple_pillbox_width,
-            closeOnSelect : false,
-            "language": {
-                "noResults": function() { return no_results_text; }
-            },
-            escapeMarkup: function (markup) { return markup; }
-        });
-    });
-
-    $(document).ready(function() {
-        $(".time-slot-pillbox").select2({
-            placeholder : "Время проведения",
-            allowClear : true,
-            width : multiple_pillbox_width,
-            closeOnSelect : false,
-            "language": {
-                "noResults": function() { return no_results_text; }
-            },
-            escapeMarkup: function (markup) { return markup; }
-        });
-    });
+    initSelect2Element(
+        ".time-slot-pillbox",
+        { placeholder : "Время проведения" }
+    );
 });
 
 document.onkeydown = function(e) {
@@ -101,6 +52,24 @@ document.onkeydown = function(e) {
         drop_filters();
     }
 };
+
+function initSelect2Element(elementName, overrideOptions = {}) {
+    const element = document.querySelector(elementName);
+
+    if (!element) { return; }
+
+    const options = {
+        allowClear : true,
+        closeOnSelect : false,
+        width: "15%",
+        language : {
+            "noResults": function() { return "Ничего не найдено"; }
+        },
+        escapeMarkup: function (markup) { return markup; }
+    };
+
+    $(element).select2({ ...options, ...overrideOptions });
+}
 
 function on_date_select_change() {
     var selected_value = document.getElementById("date-select").value;
@@ -137,12 +106,17 @@ function update_filters_visibility() {
 }
 
 function drop_filters() {
-    $("select").not(".date-select").each(function() {
-        if ($(this).data("select2")) 
-            $(this).val([]).trigger("change");
+    const pillboxes = document.querySelectorAll("select:not(.date-select)");
+    pillboxes.forEach(pillbox => {
+        pillbox.value = "";
+        const pillboxEvent = new Event("change", { bubbles: true });
+        pillbox.dispatchEvent(pillboxEvent);
     });
 
-    $(".date-select").val("today").trigger("change");
+    const datePillbox = document.querySelector(".date-select");
+    datePillbox.value = "today";
+    const datePillboxEvent = new Event("change", { bubbles: true });
+    datePillbox.dispatchEvent(datePillboxEvent);
 
     document.getElementById("left-date").value = "none";
     document.getElementById("right-date").value = "none";
