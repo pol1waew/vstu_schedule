@@ -13,6 +13,7 @@ from apps.common.models import (
     TimeSlot,
 )
 from apps.common.selectors import Selector
+from apps.common.services.timetable.read.filters import PlaceFilter, TimeSlotFilter
 from apps.common.services.timetable.utilities.model_helpers import (
     is_abstract_event_already_exists,
 )
@@ -33,6 +34,363 @@ from apps.common.services.timetable.write.factories import (
     create_abstract_event,
     fill_semester_for_dates,
 )
+
+
+class EventImporterBase:
+    __entries : list[dict] = []
+    __schedule : Schedule = Schedule.objects.none()
+    __weeks : dict = {}
+    __week_days : list[str] = []
+    __months : list[str] = []
+    __event_dates : dict = {}
+
+    def import_data(self, import_data : str) -> None:
+        """Uses given data to create AbstractEvents and Events
+        """
+
+        loaded_data = self.__load_data(import_data)
+        
+        self._extract_data(loaded_data)
+
+        self.__schedule = EventImporterBase.__find_schedule(*self._get_schedule_find_parameters())
+
+        self.__event_dates = self._calculate_dates()
+
+        for entry in self.__entries:
+            self._correct_entry_data(entry)
+
+            entry_reference_data = self.__prepare_reference_data()
+
+            entry_reference_lookup = self.__build_reference_lookup(entry_reference_data)
+
+            """
+            добавить остальные данные в vstu import
+            
+                week_id = weeks[]
+
+                abstract_day = AbstractDay.objects.get(
+                    name__startswith=1 if week_id == "first_week" else 2,
+                    name__endswith=week_days[week_day_index].capitalize()
+                )
+            """
+
+            self.__create_events(
+
+            )
+
+    def __load_data(self, data : str) -> dict:
+        """Used for loading data for later usage
+        """
+
+        return json.load(data)
+
+    def _extract_data(self, loaded_data : dict) -> None:
+        """Used to get values from loaded data
+        and store them in class variables
+        """
+
+        pass
+
+    def _correct_entry_data(self, entry : dict) -> None:
+        """Used for correcting inaccuracies and defects in data entry
+        """
+        
+        pass
+
+    def __prepare_reference_data(self, entry : dict) -> dict:
+        """Used for collecting and preparing reference lookup that entry uses
+        """
+        
+        subject : str = ""
+        kind : str = ""
+        teachers : set[str] = set()
+        groups : set[str] = set()
+        places : set[tuple[str, str]] = set()
+        time_slots : set[str] = set()
+
+        is_any_teacher_found = False
+        is_any_group_found = False
+        is_any_place_found = False
+        is_any_time_slot_found = False
+
+        subject = normalize_subject_name(entry["subject"])
+
+        kind = normalize_kind_name(entry["kind"])
+
+        for teacher in entry.get("participants", {}).get("teachers", []):
+            normalized_teacher = normalize_participant_name(teacher)
+
+            if normalized_teacher:
+                teachers.add(normalized_teacher)
+                is_any_teacher_found = True
+
+        if not is_any_teacher_found:
+            raise ValueError(f"Не удалось извлечь ПРЕПОДАВАТЕЛЕЙ из занятия '{entry}'.")
+                
+        for group in entry.get("participants", {}).get("student_groups", []):
+            normalized_group = normalize_participant_name(group)
+
+            if normalized_group:
+                groups.add(normalized_group)
+                is_any_group_found = True
+        
+        if not is_any_group_found:
+            raise ValueError(f"Не удалось извлечь ГРУППЫ из занятия '{entry}'.")
+
+        for place in entry.get("places", []):
+            normalized_place = normalize_place_building_and_room(place)
+
+            if normalized_place:
+                places.add(normalized_place)
+                is_any_place_found = True
+
+        if not is_any_place_found:
+            raise ValueError(f"Не удалось извлечь МЕСТО ПРОВЕДЕНИЯ из занятия '{entry}'.")
+
+        for time_slot in entry.get("hours", []):
+            normalized_time_slot = normalize_time_slot_display_name(time_slot)
+
+            if normalized_time_slot:
+                time_slots.add(normalized_time_slot)
+                is_any_time_slot_found = True
+
+        if not is_any_time_slot_found:
+            raise ValueError(f"Не удалось извлечь ВРЕМЯ ПРОВЕДЕНИЯ из занятия '{entry}'.")
+    
+
+        return {
+            "subject" : subject,
+            "kind" : kind,
+            "teachers" : teachers,
+            "groups" : groups,
+            "places" : places,
+            "time_slots" : time_slots
+        }
+
+    def __build_reference_lookup(self, reference_data : dict) -> dict:
+        """Used for creating models for data that not exists and 
+        making reference lookup for them
+        """
+
+        # Move to other method like MAKE_SUBJECT_REFERENCE_LOOKUP
+        # with Subject part for prepare_...
+        subject = reference_data.get("subject", str)
+        subject_reference_lookup = Subject.objects.none()
+
+        if subject:
+            existing_subject = Subject.objects.filter(name=subject)
+
+            if existing_subject.exists():
+                subject_reference_lookup = existing_subject
+            else:
+                subject_reference_lookup = Subject.objects.create(name=subject)
+
+        kind = reference_data.get("kind", str)
+        kind_reference_lookup = EventKind.objects.none()
+
+        if kind:
+            existing_kind = EventKind.objects.filter(name=kind)
+
+            if existing_kind.exists():
+                kind_reference_lookup = existing_kind
+            else:
+                kind_reference_lookup = EventKind.objects.create(name=kind)
+
+        teachers = reference_data.get("teachers", set())
+        teachers_reference_lookup = {}
+
+        if teachers:
+            existing_teachers = EventParticipant.objects.filter(name__in=teachers)
+
+            for teacher in list(existing_teachers):
+                teachers_reference_lookup.update({teacher.name : teacher})
+
+                teachers.remove(teacher.name)
+
+            # TODO: May cause ERRORS when participants with SAME name already in reference_lookup
+            # but new participant is different teacher
+            if teachers:
+                created_teachers = EventParticipant.objects.bulk_create([
+                    EventParticipant(
+                        name=name,
+                        role=EventParticipant.Role.TEACHER,
+                        is_group=False,
+                        # TODO: add department
+                    ) 
+                    for name in teachers 
+                ])
+
+                for teacher in created_teachers:
+                    teachers_reference_lookup.update({teacher.name : teacher})
+
+        groups = reference_data.get("groups", set())
+        groups_reference_lookup = {}
+
+        if groups:
+            existing_groups = EventParticipant.objects.filter(name__in=groups)
+
+            for group in list(existing_groups):
+                groups_reference_lookup.update({group.name : group})
+
+                groups.remove(group.name)
+
+            # TODO: May cause ERRORS when participants with SAME name already in reference_lookup
+            # but new participant is different group
+            if groups:
+                created_groups = EventParticipant.objects.bulk_create([
+                    EventParticipant(
+                        name=name,
+                        role=EventParticipant.Role.STUDENT,
+                        is_group=True,
+                        # TODO: add department
+                    ) 
+                    for name in groups 
+                ])
+
+                for group in created_groups:
+                    groups_reference_lookup.update({group.name : group})
+
+        places = reference_data.get("places", set())
+        places_reference_lookup = {}
+
+        if places:
+            rooms = [room for _, room in places]
+            
+            existing_places = EventPlace.objects.filter(**PlaceFilter.by_room(rooms))
+
+            for place in list(existing_places):
+                places_reference_lookup.update({(place.building, place.room) : place})
+
+                places.remove((place.building, place.room))
+
+            if places:
+                created_places = EventPlace.objects.bulk_create([
+                    EventPlace(building=building, room=room)
+                    for building, room in places
+                ])
+
+                for place in created_places:
+                    places_reference_lookup.update({(place.building, place.room) : place})
+
+        time_slots = reference_data.get("time_slots", set())
+        time_slots_reference_lookup = TimeSlot.objects.none()
+
+        if time_slots:
+            alt_names = [time_slot[0] for time_slot in time_slots]
+            starting_times = [time_slot[1] for time_slot in time_slots]
+
+            filter_by_alt_name, unhandled_alt_name = TimeSlotFilter.by_alt_name(alt_names)
+            filter_by_start_time, unhandled_start_time = TimeSlotFilter.by_start_time(starting_times)
+            
+            if not filter_by_alt_name and not filter_by_start_time:
+                raise ValueError(f"Не удалось составить фильтр ПО ВРЕМЕНИ НАЧАЛА занятия и ПО АКАДЕМИЧЕСКОМУ ЧАСУ '{time_slots}'.")
+
+            time_slots_reference_lookup = TimeSlot.objects.filter(**filter_by_alt_name)
+            time_slots_reference_lookup |= TimeSlot.objects.filter(**filter_by_start_time)
+
+            # TODO: also remove time_slots from 'time_slots'
+            # if time_slots still contains something
+            # error
+
+        return {
+            "subject" : subject_reference_lookup,
+            "kind" : kind_reference_lookup,
+            "participants" : teachers_reference_lookup | groups_reference_lookup,
+            "places" : places_reference_lookup,
+            "time_slots" : time_slots_reference_lookup
+        }
+
+    def __create_events(
+            self,
+            kind : EventKind, 
+            subject : Subject,
+            participants : list[EventParticipant],
+            places : list[EventPlace],
+            abstract_day : AbstractDay,
+            time_slots : list[TimeSlot],
+            abstract_event_dates : list[date]|list[None],
+            event_dates : list[date]
+        ) -> None:
+        """Used for creating AbstractEvents and Events from data
+        """
+        """
+        for date_ in holds_on_dates:
+            for time_slot in time_slots:
+                if is_abstract_event_already_exists(
+                    kind, subject, participants, places, abstract_day, time_slot, date_, schedule
+                ):
+                    continue
+                
+                created_abstract_event = create_abstract_event(
+                    kind, subject, participants, places, abstract_day, time_slot, date_, schedule
+                )
+
+                fill_semester_for_dates(created_abstract_event, calendar)
+        """
+        pass
+
+    def _get_schedule_find_parameters(self) -> tuple[int, str, str, int, str]:
+        """Used to make Schedule find parameters
+
+        Returns course, faculty, scope, semester, years 
+        """
+        
+        return
+
+    @staticmethod
+    def __find_schedule(course : int,
+                        faculty : str,
+                        scope : str,
+                        semester : int,
+                        years : str) -> None:
+        """Finds Schedule by given parameters
+        
+        If Schedule not exists then creates it
+        """
+
+        selector = Selector({"status" : Schedule.Status.ACTIVE})
+
+        selector.add_filter({"metadata__course" : course})
+        selector.add_filter({"schedule_template__metadata__faculty__iexact" : faculty})
+        selector.add_filter({"schedule_template__metadata__scope" : get_scope_from_label(
+            normalize_scope(scope)
+        )})
+        selector.add_filter({"metadata__semester" : semester})
+        selector.add_filter({"metadata__years" : years})
+
+        selector.find_models(Schedule)
+
+        if not selector.is_any_model_found():
+            raise Schedule.DoesNotExist(
+                f"Расписание с параметрами {selector.get_filter_query()} не найдено."
+            )
+        
+        if not selector.is_single_model_found():
+            raise Schedule.MultipleObjectsReturned(
+                f"Найдено несколько расписаний, удовлетворяющих параметрам {selector.get_filter_query()}."
+                "Уточните параметры поиска."
+            )
+        
+        return selector.get_found_models().first()
+    
+    def _calculate_dates(self) -> dict:
+        """Used to get dates for all AbstractEvents and Events
+        """
+        
+        return {}
+
+    def _set_entries(self, entries : list[dict]) -> None:
+        self.__entries = entries
+
+    def _set_weeks(self) -> None:
+        pass
+
+    def _set_week_days(self) -> None:
+        pass
+
+    def _set_months(self) -> None:
+        pass
+
 
 
 class EventImporter:
@@ -388,11 +746,11 @@ class EventImporter:
         # 2024 -  2025
         FULL_YEARS_REG_EX = r"(\d{4}\s*-\s*\d{4})"
         
-        reader = Selector()
+        selector = Selector()
 
         course_match = re.search(COURSE_REG_EX, title, flags=re.IGNORECASE)
         if course_match:
-            reader.add_filter({"metadata__course" : int(course_match.group(1))})
+            selector.add_filter({"metadata__course" : int(course_match.group(1))})
 
         faculty_matches = re.findall(FACULTY_REG_EX, title)
         if not faculty_matches:
@@ -407,7 +765,7 @@ class EventImporter:
                 continue
             
             # take first existing faculty from title
-            reader.add_filter({"schedule_template__metadata__faculty__iexact" : match})
+            selector.add_filter({"schedule_template__metadata__faculty__iexact" : match})
 
             is_faculty_found = True
 
@@ -418,37 +776,37 @@ class EventImporter:
 
         scope_match = re.search(SCOPE_REG_EX, title)
         if scope_match:
-            reader.add_filter({"schedule_template__metadata__scope" : get_scope_from_label(
+            selector.add_filter({"schedule_template__metadata__scope" : get_scope_from_label(
                 normalize_scope(scope_match.group(1))
             )})
 
         semester_match = re.search(ARABIC_NUMERALS_SEMESTER_REG_EX, title, flags=re.IGNORECASE)
         if semester_match:
-            reader.add_filter({"metadata__semester" : int(semester_match.group(1))})
+            selector.add_filter({"metadata__semester" : int(semester_match.group(1))})
 
         full_years_match = re.search(FULL_YEARS_REG_EX, title)
         if full_years_match:
-            reader.add_filter({"metadata__years" : full_years_match.group(1).replace(" ", "")})
+            selector.add_filter({"metadata__years" : full_years_match.group(1).replace(" ", "")})
 
-        if not reader.has_any_filter_added():
+        if not selector.has_any_filter_added():
             raise ValueError(f"Не удалось извлечь параметры расписания из заголовка '{title}'.")
         
-        reader.add_filter({"status" : Schedule.Status.ACTIVE})
-        reader.find_models(Schedule)
+        selector.add_filter({"status" : Schedule.Status.ACTIVE})
+        selector.find_models(Schedule)
 
-        if not reader.is_any_model_found():
+        if not selector.is_any_model_found():
             raise Schedule.DoesNotExist(
-                f"Расписание с параметрами {reader.get_filter_query()} не найдено."
+                f"Расписание с параметрами {selector.get_filter_query()} не найдено."
                 f"Заголовок: '{title}'."
             )
         
-        if not reader.is_single_model_found():
+        if not selector.is_single_model_found():
             raise Schedule.MultipleObjectsReturned(
-                f"Найдено несколько расписаний, удовлетворяющих параметрам {reader.get_filter_query()}."
+                f"Найдено несколько расписаний, удовлетворяющих параметрам {selector.get_filter_query()}."
                 "Уточните заголовок."
             )
         
-        return reader.get_found_models().first()
+        return selector.get_found_models().first()
 
     @staticmethod
     def make_calendar(weeks, months : list[str], schedule : Schedule) -> dict:

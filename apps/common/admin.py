@@ -480,12 +480,12 @@ class DayDateOverrideAdmin(BaseAdmin):
         """
         
         for ddo in queryset:
-            reader = Selector(DateFilter.from_singe_date(ddo.day_source))
-            reader.add_filter(EventFilter.by_department(ddo.department))
+            selector = Selector(DateFilter.from_singe_date(ddo.day_source))
+            selector.add_filter(EventFilter.by_department(ddo.department))
             
-            reader.find_models(Event)
+            selector.find_models(Event)
             
-            for e in reader.get_found_models():
+            for e in selector.get_found_models():
                 apply_day_date_override(ddo, e)
 
         messages.success(request, "Успешно перенесены")

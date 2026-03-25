@@ -39,45 +39,45 @@ def make_table_data(filters : dict) -> list[
     """Used to get filtered and formated data ready to visualisation
     """
     
-    reader = Selector()
+    selector = Selector()
     # Currently working ONLY with ACTIVE Schedules
     # TODO: selector for ARCHIVE and other Schdules 
-    reader.add_filter(ScheduleFilter.is_active())
+    selector.add_filter(ScheduleFilter.is_active())
     
     if filters["date"] == "today":
-        reader.add_filter(DateFilter.today())
+        selector.add_filter(DateFilter.today())
     elif filters["date"] == "tomorrow":
-        reader.add_filter(DateFilter.tomorrow())
+        selector.add_filter(DateFilter.tomorrow())
     elif filters["date"] == "this_week":
-        reader.add_filter(DateFilter.this_week())
+        selector.add_filter(DateFilter.this_week())
     elif filters["date"] == "next_week":
-        reader.add_filter(DateFilter.next_week())
+        selector.add_filter(DateFilter.next_week())
     elif filters["date"] == "single_date" and filters["left_date"] != "":
-        reader.add_filter(DateFilter.from_singe_date(filters["left_date"]))
+        selector.add_filter(DateFilter.from_singe_date(filters["left_date"]))
     elif filters["date"] == "range_date" and filters["left_date"] != "" and filters["right_date"] != "":
-        reader.add_filter(DateFilter.from_date(filters["left_date"], filters["right_date"]))
+        selector.add_filter(DateFilter.from_date(filters["left_date"], filters["right_date"]))
 
     if filters["group"]:
-        reader.add_filter(ParticipantFilter.by_name(filters["group"]))
+        selector.add_filter(ParticipantFilter.by_name(filters["group"]))
 
     if filters["place"]:
-        reader.add_filter(PlaceFilter.by_building_and_room_event_relative(filters["place"]))
+        selector.add_filter(PlaceFilter.by_building_and_room_event_relative(filters["place"]))
 
     if filters["subject"]:
-        reader.add_filter(SubjectFilter.by_name(filters["subject"]))
+        selector.add_filter(SubjectFilter.by_name(filters["subject"]))
         
     if filters["kind"]:
-        reader.add_filter(KindFilter.by_name(filters["kind"]))
+        selector.add_filter(KindFilter.by_name(filters["kind"]))
 
     if filters["time_slot"]:
-        reader.add_filter(TimeSlotFilter.from_display_name_event_relative(filters["time_slot"]))
+        selector.add_filter(TimeSlotFilter.from_display_name_event_relative(filters["time_slot"]))
 
-    reader.find_models(Event)
+    selector.find_models(Event)
 
     if filters["teacher"]:
-        entries = format_events(reader.get_found_models().filter(**ParticipantFilter.by_name(filters["teacher"])).distinct())
+        entries = format_events(selector.get_found_models().filter(**ParticipantFilter.by_name(filters["teacher"])).distinct())
     else:
-        entries = format_events(reader.get_found_models())
+        entries = format_events(selector.get_found_models())
 
     row_spans = make_row_spans(entries)
     calendar = make_calendar(entries)

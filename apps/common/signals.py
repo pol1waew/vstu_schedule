@@ -130,22 +130,22 @@ def on_event_cancel_date_override(sender, instance, **kwargs):
     if previous_cancel.date != instance.date:
         from apps.common.selectors import Selector
 
-        reader = Selector({"event_cancel" : previous_cancel})
+        selector = Selector({"event_cancel" : previous_cancel})
         
-        reader.find_models(Event)
+        selector.find_models(Event)
         
-        for e in reader.get_found_models():
+        for e in selector.get_found_models():
             apply_event_cancel(None, e)
 
 @receiver(pre_delete, sender=EventCancel)
 def on_event_cancel_delete(sender, instance, **kwargs):
     from apps.common.selectors import Selector
 
-    reader = Selector({"event_cancel" : instance})
+    selector = Selector({"event_cancel" : instance})
     
-    reader.find_models(Event)
+    selector.find_models(Event)
     
-    for e in reader.get_found_models():
+    for e in selector.get_found_models():
         apply_event_cancel(None, e)
 
 @receiver(pre_save, sender=DayDateOverride)
@@ -162,22 +162,22 @@ def on_date_override_source_override(sender, instance, **kwargs):
     if previous_override.day_source != instance.day_source:
         from apps.common.selectors import Selector
 
-        reader = Selector({"date_override" : previous_override})
+        selector = Selector({"date_override" : previous_override})
         
-        reader.find_models(Event)
+        selector.find_models(Event)
 
-        for e in reader.get_found_models():
+        for e in selector.get_found_models():
             apply_day_date_override(None, e)
 
 @receiver(pre_delete, sender=DayDateOverride)
 def on_day_date_override_delete(sender, instance, **kwargs):
     from apps.common.selectors import Selector
 
-    reader = Selector({"date_override" : instance})
+    selector = Selector({"date_override" : instance})
         
-    reader.find_models(Event)
+    selector.find_models(Event)
     
-    for e in reader.get_found_models():
+    for e in selector.get_found_models():
             apply_day_date_override(None, e)
 
 @receiver(m2m_changed, sender=Event.participants_override.through)

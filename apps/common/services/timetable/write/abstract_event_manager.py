@@ -51,26 +51,26 @@ def check_for_day_date_override(abstract_event : AbstractEvent) -> None:
 
     from apps.common.services.timetable.write.factories import apply_day_date_override
     
-    reader = Selector({"department" : abstract_event.department})
+    selector = Selector({"department" : abstract_event.department})
 
     # getting all DayDateOverrides for AbstractEvent
-    reader.find_models(DayDateOverride)
-    date_overrides = reader.get_found_models()
+    selector.find_models(DayDateOverride)
+    date_overrides = selector.get_found_models()
 
-    reader.clear_filter_query()
-    reader.add_filter({"abstract_event" : abstract_event})
+    selector.clear_filter_query()
+    selector.add_filter({"abstract_event" : abstract_event})
 
     # applying date overrides to Events
     for ddo in date_overrides:
-        reader.add_filter(DateFilter.from_singe_date(ddo.day_source))
+        selector.add_filter(DateFilter.from_singe_date(ddo.day_source))
         
-        reader.find_models(Event)
+        selector.find_models(Event)
         
-        if reader.get_found_models().exists():
-            for e in reader.get_found_models():
+        if selector.get_found_models().exists():
+            for e in selector.get_found_models():
                 apply_day_date_override(ddo, e)
 
-        reader.remove_last_filter()
+        selector.remove_last_filter()
 
 def refresh_related_events(abstract_event : AbstractEvent, update_non_m2m : bool = True, update_m2m : bool = True) -> None:
     """Renew related Events with values from given AbstractEvent

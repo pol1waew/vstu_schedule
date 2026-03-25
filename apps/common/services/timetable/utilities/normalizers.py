@@ -46,13 +46,13 @@ def normalize_time_slot_display_name(display_name : str) -> tuple[str, str, str]
     and formated as (\\d-\\d HH:MM HH:MM). Empty values equals ''
     """
 
+    if display_name is None:
+        return None
+
     # 1-2
     # 3 -  4
     # exclude 8:30-10.00
     ALT_NAME_REG_EX = r"^\d{1,2}\s*\-+\s*\d{1,2}$"
-
-    if display_name is None:
-        return None
     
     time_slot = display_name.strip()
 

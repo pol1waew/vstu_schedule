@@ -204,13 +204,13 @@ class ScheduleTemplate(CommonModel):
         from apps.common.services.timetable.read.filters import AbstractEventFilter
         from apps.common.services.timetable.write.factories import rewrite_events
 
-        reader = Selector({"schedule__schedule_template" : self})
+        selector = Selector({"schedule__schedule_template" : self})
         # getting AbstractEvents with existing Events
-        reader.add_filter(AbstractEventFilter.with_existing_events())
+        selector.add_filter(AbstractEventFilter.with_existing_events())
         
-        reader.find_models(AbstractEvent)
+        selector.find_models(AbstractEvent)
 
-        rewrite_events(reader.get_found_models())
+        rewrite_events(selector.get_found_models())
 
 
 class Schedule(CommonModel):
@@ -251,13 +251,13 @@ class Schedule(CommonModel):
         from apps.common.services.timetable.read.filters import AbstractEventFilter
         from apps.common.services.timetable.write.factories import rewrite_events
 
-        reader = Selector({"schedule" : self})
+        selector = Selector({"schedule" : self})
         # getting AbstractEvent with existing Event
-        reader.add_filter(AbstractEventFilter.with_existing_events())
+        selector.add_filter(AbstractEventFilter.with_existing_events())
         
-        reader.find_models(AbstractEvent)
+        selector.find_models(AbstractEvent)
 
-        rewrite_events(reader.get_found_models())
+        rewrite_events(selector.get_found_models())
 
 
 class EventParticipant(CommonModel):
@@ -557,12 +557,12 @@ class EventCancel(CommonModel):
         )
         from apps.common.services.timetable.write.factories import apply_event_cancel
 
-        reader = Selector(DateFilter.from_singe_date(self.date))
-        reader.add_filter(EventFilter.by_department(self.department))
+        selector = Selector(DateFilter.from_singe_date(self.date))
+        selector.add_filter(EventFilter.by_department(self.department))
         
-        reader.find_models(Event)
+        selector.find_models(Event)
         
-        for e in reader.get_found_models():
+        for e in selector.get_found_models():
             apply_event_cancel(self, e)
 
 
@@ -590,12 +590,12 @@ class DayDateOverride(CommonModel):
             apply_day_date_override,
         )
 
-        reader = Selector(DateFilter.from_singe_date(self.day_source))
-        reader.add_filter(EventFilter.by_department(self.department))
+        selector = Selector(DateFilter.from_singe_date(self.day_source))
+        selector.add_filter(EventFilter.by_department(self.department))
         
-        reader.find_models(Event)
+        selector.find_models(Event)
         
-        for e in reader.get_found_models():
+        for e in selector.get_found_models():
             apply_day_date_override(self, e)
 
 
@@ -639,13 +639,13 @@ class Event(CommonModel):
                 apply_day_date_override,
             )
 
-            reader = Selector({"day_source" : self.date})
-            reader.add_filter({"department" : self.department})
+            selector = Selector({"day_source" : self.date})
+            selector.add_filter({"department" : self.department})
 
-            reader.find_models(DayDateOverride)
+            selector.find_models(DayDateOverride)
 
-            if reader.get_found_models().exists():
-                apply_day_date_override(reader.get_found_models().first(), self, call_save_method=False)
+            if selector.get_found_models().exists():
+                apply_day_date_override(selector.get_found_models().first(), self, call_save_method=False)
 
             return
 
@@ -667,13 +667,13 @@ class Event(CommonModel):
         from apps.common.services.timetable.read.filters import DateFilter
         from apps.common.services.timetable.write.factories import apply_event_cancel
 
-        reader = Selector({"department" : self.department})
-        reader.add_filter(DateFilter.from_singe_date(self.date))
+        selector = Selector({"department" : self.department})
+        selector.add_filter(DateFilter.from_singe_date(self.date))
 
-        reader.find_models(EventCancel)
+        selector.find_models(EventCancel)
 
-        if reader.get_found_models().exists():
-            apply_event_cancel(reader.get_found_models().first(), self, False)
+        if selector.get_found_models().exists():
+            apply_event_cancel(selector.get_found_models().first(), self, False)
         else:
             self.is_event_canceled = False
             self.event_cancel = None

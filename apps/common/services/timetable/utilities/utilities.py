@@ -79,18 +79,18 @@ def get_name_from_month_number(month_number : int|list[int]) -> str|None|list[st
     return MONTH_NAMES[month_number - 1] if month_number >= 1 and month_number <= 12 else None 
 
 def get_scope_from_label(scope_label : str) -> ScheduleTemplateMetadata.Scope|None:
-        SCOPES_REG_EXS = [
-            (ScheduleTemplateMetadata.Scope.BACHELOR, r"(([бБ]акалавр)[а-яА-ЯёЁ]*)"),
-            (ScheduleTemplateMetadata.Scope.MASTER, r"(([мМ]агистр)[а-яА-ЯёЁ]*)"),
-            (ScheduleTemplateMetadata.Scope.POSTGRADUATE, r"(([аА]спирант)[а-яА-ЯёЁ]*)"),
-            (ScheduleTemplateMetadata.Scope.CONSULTATION, r"(([кК]онсульт)[а-яА-ЯёЁ]*)")
-        ]
+    SCOPES_REG_EXS = [
+        (ScheduleTemplateMetadata.Scope.BACHELOR, r"(([бБ]акалавр)[а-яА-ЯёЁ]*)"),
+        (ScheduleTemplateMetadata.Scope.MASTER, r"(([мМ]агистр)[а-яА-ЯёЁ]*)"),
+        (ScheduleTemplateMetadata.Scope.POSTGRADUATE, r"(([аА]спирант)[а-яА-ЯёЁ]*)"),
+        (ScheduleTemplateMetadata.Scope.CONSULTATION, r"(([кК]онсульт)[а-яА-ЯёЁ]*)")
+    ]
+    
+    for scope, reg_ex in SCOPES_REG_EXS:
+        if re.search(reg_ex, normalize_scope(scope_label)):
+            return scope
         
-        for scope, reg_ex in SCOPES_REG_EXS:
-            if re.search(reg_ex, normalize_scope(scope_label)):
-                return scope
-            
-        return None
+    return None
 
 def is_events_follow_each_other(first_event : Event, second_event : Event) -> bool:
     """Checks is Events follow one after other by time slot
