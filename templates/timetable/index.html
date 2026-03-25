@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        {% load static %}
+        <link href="{% static 'client/css/select2_style.css' %}" rel="stylesheet">
+        <link href="{% static 'client/css/style.css' %}" rel="stylesheet">
+        <script src="{% static 'client/js/jqueryScripts.js' %}"></script>
+        <script src="{% static 'client/js/select2Scripts.js' %}"></script>
+        <script src="{% static 'client/js/tableScripts.js' %}"></script>
+        <script src="{% static 'client/js/headerScripts.js' %}"></script>
+        <title>Расписание</title>
+    </head>
+
+    <body>
+        {% include "timetable/header.html" %}
+
+        {% if request.method == "GET" %}
+            {% include "timetable/welcome.html" %}
+        {% elif request.method == "POST" %}
+            {% if data|length == 0 %}
+                {% include "timetable/emptyTable.html" %}
+            {% else %}
+                {% include "timetable/table.html" %}    
+                
+                {% include "timetable/footer.html" %}
+            {% endif %}
+        {% endif %}
+    </body>
+</html>
