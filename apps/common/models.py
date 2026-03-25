@@ -445,7 +445,7 @@ class AbstractEvent(CommonModel):
     def save(self, **kwargs):
         super().save(**kwargs)
 
-        from apps.common.services.timetable.write.abstract_event_manager import (
+        from apps.common.services.timetable.write.factories import (
             refresh_related_events,
         )
 

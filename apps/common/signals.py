@@ -10,12 +10,10 @@ from apps.common.models import (
     Event,
     EventCancel,
 )
-from apps.common.services.timetable.write.abstract_event_manager import (
-    refresh_related_events,
-)
 from apps.common.services.timetable.write.factories import (
     apply_day_date_override,
     apply_event_cancel,
+    refresh_related_events,
     rewrite_events,
 )
 

@@ -19,7 +19,7 @@ from apps.common.services.timetable.utilities.utilities import (
     is_events_follow_each_other,
     is_similar_events,
 )
-from apps.common.services.timetable.write.abstract_event_manager import (
+from apps.common.services.timetable.write.factories import (
     calculate_semester_filling_parameters,
 )
 
