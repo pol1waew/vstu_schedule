@@ -22,5 +22,6 @@ from django.urls import include, path
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("timetable/", include("apps.client.urls")),
-    path('', include('apps.client.urls')),
+    # Освободить корень проекта для включения остальных подсистем.
+    # path('', include('apps.client.urls')),
 ]
