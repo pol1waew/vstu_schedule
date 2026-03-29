@@ -20,7 +20,7 @@ from apps.common.services.timetable.read.filters import AbstractEventFilter
 def create_common_abstract_days() -> bool:
     """Used for fast AbstractDays creating
     """
-    
+
     ABSTRACT_DAYS_DATA = [
         (0, "1 неделя, Понедельник"),
         (1, "1 неделя, Вторник"),
@@ -86,12 +86,12 @@ def create_common_time_slots() -> bool:
                     end_time=data[2]
                 )
             )
-    
+
     if time_slots_to_create:
         TimeSlot.objects.bulk_create(time_slots_to_create)
 
         return True
-    
+
     return False
 
 def is_abstract_event_already_exists(kind : EventKind, 
@@ -104,7 +104,7 @@ def is_abstract_event_already_exists(kind : EventKind,
                                         schedule : Schedule) -> bool:
     """Checks if AbstractEvent by given parameters already exists
     """
-    
+
     return AbstractEvent.objects.filter(**AbstractEventFilter.is_already_exist(
         kind,
         subject, 
@@ -163,17 +163,17 @@ def get_all_places() -> QuerySet[EventPlace]:
 def get_all_subjects() -> QuerySet[Subject]:
     """Returns all existing Subjects 
     """
-    
+
     return Subject.objects.all()
 
 def get_all_kinds() -> QuerySet[EventKind]:
     """Returns all existing EventKinds 
     """
-    
+
     return EventKind.objects.all()
 
 def get_all_time_slots() -> QuerySet[TimeSlot]:
     """Returns all existing TimeSlots 
     """
-    
+
     return TimeSlot.objects.all()

@@ -1,18 +1,16 @@
 [project]
 name = "vstu-schedule"
-version = "0.0.1-alpha"
+version = "0.1.0-alpha"
 description = "Unified VSTU Schedule project"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "celery>=5.6.2",
-    "django>=6.0.1",
+    "celery>=5.6.3",
+    "django>=6.0.3",
     "django-celery-beat>=2.9.0",
     "gunicorn>=23.0.0",
     "psycopg>=3.3.2",
-    "psycopg[pool]>=3.3.0",
-    "psycopg[binary]>=3.3.3",
-	"psycopg[c]>=3.3.3",
+    "psycopg[binary,pool]>=3.3.0",
     "python-dotenv>=1.2.1",
     "redis>=7.1.0",
     "xlsxwriter>=3.2.9",
@@ -22,5 +20,5 @@ dependencies = [
 dev = [
     "pytest>=9.0.2",
     "pytest-django>=4.11.1",
-    "ruff>=0.15.2",
+    "ruff>=0.15.8",
 ]

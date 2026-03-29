@@ -42,7 +42,7 @@ class EventImporter:
         """
 
         json_data = json.loads(event_data)
-        
+
         cls.make_import(
             json_data["title"],
             json_data["table"]["grid"],
@@ -60,7 +60,7 @@ class EventImporter:
                     months : list[str]):
         """Applies data on database
         """
-        
+
         schedule = cls.find_schedule(replace_roman_with_arabic_numerals(title))
         reference_lookup = {
             "subjects" : {},
@@ -77,7 +77,7 @@ class EventImporter:
 
             if not reference_data:
                 continue
-            
+
             cls.make_reference_lookup(reference_data, reference_lookup)
 
             calendar = cls.make_calendar(weeks, months, schedule)
@@ -106,7 +106,7 @@ class EventImporter:
         """Replaces ".." and ";" in holds_on_date with correct dates
 
         Returns corrected sorted list holds_on_date of unique dates
-        
+
         Returns None when nothing changed
         """
 
@@ -207,7 +207,7 @@ class EventImporter:
     def collect_reference_data(event_data) -> dict:
         """Collects and prepares data
         """
-        
+
         subjects : set[str] = set()
         kinds : set[str] = set()
         teachers : set[str] = set()
@@ -224,7 +224,7 @@ class EventImporter:
 
             if normalized_teacher:
                 teachers.add(normalized_teacher)
-                
+
         for group in event_data.get("participants", {}).get("student_groups", []):
             normalized_group = normalize_participant_name(group)
 
@@ -298,7 +298,7 @@ class EventImporter:
 
             if kinds_to_create:
                 created_kinds = EventKind.objects.bulk_create(kinds_to_create)
-                
+
                 for kind in created_kinds:
                     reference_lookup["kinds"].update({kind.name : kind})
 
@@ -353,7 +353,7 @@ class EventImporter:
 
         Title must contain course, faculty, scope, semester and years information
         """
-        
+
         # 4 курса
         # 4 курс
         # 4курса
@@ -383,11 +383,11 @@ class EventImporter:
         # 2-й семестр
         # 1ый семестр
         ARABIC_NUMERALS_SEMESTER_REG_EX = r"(\d)(\-?[а-яА-ЯёЁ]*)?\s*семестра?"
-        
+
         # 2024-2025
         # 2024 -  2025
         FULL_YEARS_REG_EX = r"(\d{4}\s*-\s*\d{4})"
-        
+
         reader = Selector()
 
         course_match = re.search(COURSE_REG_EX, title, flags=re.IGNORECASE)
@@ -399,13 +399,13 @@ class EventImporter:
             raise ValueError(f"Не удалось извлечь подразделение или факультет из заголовка '{title}'.")
 
         is_faculty_found = False
-        
+
         for match in faculty_matches:
             try:
                 Department.objects.get(shortname=match)
             except Department.DoesNotExist:
                 continue
-            
+
             # take first existing faculty from title
             reader.add_filter({"schedule_template__metadata__faculty__iexact" : match})
 
@@ -432,7 +432,7 @@ class EventImporter:
 
         if not reader.has_any_filter_added():
             raise ValueError(f"Не удалось извлечь параметры расписания из заголовка '{title}'.")
-        
+
         reader.add_filter({"status" : Schedule.Status.ACTIVE})
         reader.find_models(Schedule)
 
@@ -441,13 +441,13 @@ class EventImporter:
                 f"Расписание с параметрами {reader.get_filter_query()} не найдено."
                 f"Заголовок: '{title}'."
             )
-        
+
         if not reader.is_single_model_found():
             raise Schedule.MultipleObjectsReturned(
                 f"Найдено несколько расписаний, удовлетворяющих параметрам {reader.get_filter_query()}."
                 "Уточните заголовок."
             )
-        
+
         return reader.get_found_models().first()
 
     @staticmethod
@@ -505,13 +505,13 @@ class EventImporter:
         return calendar
 
     @staticmethod
-    def parse_data(event_data, 
-                   calendar, 
-                   week_days : list[str], 
+    def parse_data(event_data,
+                   calendar,
+                   week_days : list[str],
                    reference_lookup : dict) -> tuple[
-                       EventKind, 
-                       Subject, 
-                       list[EventParticipant], 
+                       EventKind,
+                       Subject,
+                       list[EventParticipant],
                        list[EventPlace],
                        list[AbstractDay],
                        list[TimeSlot],
@@ -522,7 +522,7 @@ class EventImporter:
 
         Raise DoesNotExist if model not found
         """
-        
+
         pass
 
     @staticmethod
@@ -546,7 +546,7 @@ class EventImporter:
                     kind, subject, participants, places, abstract_day, time_slot, date_, schedule
                 ):
                     continue
-                
+
                 created_abstract_event = create_abstract_event(
                     kind, subject, participants, places, abstract_day, time_slot, date_, schedule
                 )

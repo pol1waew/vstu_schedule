@@ -7,3 +7,4 @@ class CommonConfig(AppConfig):
 
     def ready(self):
         import apps.common.signals
+        # TODO: не дописано?
