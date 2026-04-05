@@ -53,7 +53,7 @@ class ReferenceImporter:
                     room=normalized_place[1]
                 )
             )
-            
+
             already_read_places.append(normalized_place)
 
         if places_to_create:
@@ -73,16 +73,16 @@ class ReferenceImporter:
 
         for entry in json_data:
             subject = entry["discipline_name"]
-            
+
             if subject in already_read_subjects or is_subject_already_exists(subject):
                 continue
 
             subjects_to_create.append(
                 Subject(name=subject)
             )
-            
+
             already_read_subjects.append(subject)
-        
+
         if subjects_to_create:
             Subject.objects.bulk_create(subjects_to_create)
 
@@ -120,7 +120,7 @@ class ReferenceImporter:
             )
 
             already_read_faculties.append((department_name, department_shortname, department_code))
-        
+
         if faculties_to_create:
             Department.objects.bulk_create(faculties_to_create)
 
@@ -165,7 +165,7 @@ class ReferenceImporter:
             )
 
             already_read_departments.append((department_name, department_shortname, department_code))
-        
+
         if departments_to_create:
             Department.objects.bulk_create(departments_to_create)
 
@@ -200,7 +200,7 @@ class ReferenceImporter:
                     department=department
                 )
             )
-        
+
         if teachers_to_create:
             EventParticipant.objects.bulk_create(teachers_to_create)
 
@@ -212,7 +212,7 @@ class ReferenceImporter:
 
         Not create duplicates
         """
-        
+
         json_data = json.loads(reference_data)
 
         students_to_create = []
@@ -238,7 +238,7 @@ class ReferenceImporter:
                 )
             )
             already_read_students.append(student_name)
-        
+
         if students_to_create:
             EventParticipant.objects.bulk_create(students_to_create)
 
@@ -251,7 +251,7 @@ class ReferenceImporter:
 
             if not scope_value:
                 raise ValueError(f"Степень обучения '{entry["scope"]}' не найдена.")
-            
+
             try:
                 schedule_template_metadata = ScheduleTemplateMetadata.objects.get(
                     faculty=entry["schedule_template_metadata_faculty_shortname"],
@@ -267,7 +267,7 @@ class ReferenceImporter:
                 department_ = Department.objects.get(shortname=entry["department_shortname"])
             except Department.DoesNotExist:
                 raise Department.DoesNotExist(f"Подразделение '{entry["department_shortname"]}' не найдено.")
-            
+
             try:
                 schedule_template = ScheduleTemplate.objects.get(
                     metadata=schedule_template_metadata,
@@ -280,7 +280,7 @@ class ReferenceImporter:
                     repeatable=True,
                     aligned_by_week_day=1,
                     department=department_
-                )            
+                )
 
             try:
                 schedule_metadata = ScheduleMetadata.objects.get(

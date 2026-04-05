@@ -25,14 +25,14 @@ def create_event_for_date(date_ : str|date, abstract_event : AbstractEvent) -> N
         date_ = date.fromisoformat(date_)
 
     event = Event()
-    
+
     event.date = date_
     event.kind_override = abstract_event.kind
     event.subject_override = abstract_event.subject
     event.time_slot_override = abstract_event.time_slot
     event.abstract_event = abstract_event
     event.is_event_canceled = False
-    
+
     event.save()
 
     event.participants_override.add(*abstract_event.participants.all())
@@ -89,14 +89,14 @@ def fill_semester_by_repeating(abstract_event : AbstractEvent) -> None:
         while date_ <= semester_end_date: # TODO: check < or <=
             if date_ >= semester_start_date:
                 create_event_for_date(date_, abstract_event)
-            
+
                 # creating Event for only first acceptable date
                 # if abstract_event is not repeatable
                 if not abstract_event.schedule.schedule_template.repeatable:
                     break
-            
+
             date_ += timedelta(days=repetition_period)
-    
+
     check_for_day_date_override(abstract_event)
 
 def fill_semester_for_dates(abstract_event : AbstractEvent, dates : list[date]) -> None:
@@ -112,12 +112,12 @@ def fill_semester_for_dates(abstract_event : AbstractEvent, dates : list[date]) 
     else:
         for date_ in dates:
             create_event_for_date(date_, abstract_event)
-    
+
     check_for_day_date_override(abstract_event)
 
 def apply_day_date_override(date_override : DayDateOverride, event : Event, call_save_method : bool = True) -> None:
     """Changes Event date to date from given DayDateOverride
-    
+
     Use date_override=None to detach Event from date override
 
     Use call_save_method to save Event after changes
@@ -125,7 +125,7 @@ def apply_day_date_override(date_override : DayDateOverride, event : Event, call
 
     if date_override:
         event.date = date_override.day_destination
-        event.date_override = date_override      
+        event.date_override = date_override
     else:
         event.date = event.date_override.day_source
 
@@ -144,7 +144,7 @@ def apply_event_cancel(event_cancel : EventCancel, event : Event, call_save_meth
     else:
         event.is_event_canceled = False
         event.event_cancel = None
-        
+
     if call_save_method:
         event.save()
 
@@ -154,7 +154,7 @@ def rewrite_events(abstract_event : AbstractEvent) -> bool:
 
         Will delete only NOT overriden Events
         """
-        
+
         # deleting only not overriden events
         filter_query = EventFilter.not_overriden()
 
@@ -166,7 +166,7 @@ def rewrite_events(abstract_event : AbstractEvent) -> bool:
             filter_query.update({"abstract_event__pk" : abstract_event.pk})
 
             Event.objects.filter(**filter_query).delete()
-            
+
             # filling semester by Events from abstract_event
             fill_semester_by_repeating(abstract_event)
         # working with list of AbstractEvents
@@ -175,11 +175,11 @@ def rewrite_events(abstract_event : AbstractEvent) -> bool:
             filter_query.update({"abstract_event__in" : abstract_event})
 
             Event.objects.filter(**filter_query).delete()
-            
+
             # filling semester by Events from every AbstractEvent
             for ae in abstract_event:
                 fill_semester_by_repeating(ae)
-                
+
         return True
 
 def calculate_semester_filling_parameters(abstract_event : AbstractEvent) -> tuple[date, date, date, int]:
@@ -187,7 +187,7 @@ def calculate_semester_filling_parameters(abstract_event : AbstractEvent) -> tup
 
     Returns semester_start_date, semester_end_date, fill_from_date, repetition_period
     """
-    
+
     semester_start_date = abstract_event.schedule.start_date
 
     # if semester starts from FIRST week
@@ -223,7 +223,7 @@ def check_for_day_date_override(abstract_event : AbstractEvent) -> None:
     """
 
     from apps.common.services.timetable.write.factories import apply_day_date_override
-    
+
     reader = Selector({"department" : abstract_event.department})
 
     # getting all DayDateOverrides for AbstractEvent
@@ -236,9 +236,9 @@ def check_for_day_date_override(abstract_event : AbstractEvent) -> None:
     # applying date overrides to Events
     for ddo in date_overrides:
         reader.add_filter(DateFilter.from_singe_date(ddo.day_source))
-        
+
         reader.find_models(Event)
-        
+
         if reader.get_found_models().exists():
             for e in reader.get_found_models():
                 apply_day_date_override(ddo, e)
@@ -256,10 +256,10 @@ def refresh_related_events(abstract_event : AbstractEvent, update_non_m2m : bool
 
     Saves Event after changes
     """
-    
+
     if not update_non_m2m and not update_m2m:
         return
-    
+
     filter_query = {"abstract_event" : abstract_event}
     filter_query.update(EventFilter.not_overriden())
 

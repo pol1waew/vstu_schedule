@@ -91,7 +91,7 @@ class EventImporterLegacy:
     def _ensure_reference_data(cls, reference_data : dict) -> None:
         """Creates models for non-existing inside database JSON data
         """
-        
+
         if not reference_data:
             return
 

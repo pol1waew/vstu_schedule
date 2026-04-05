@@ -7,9 +7,6 @@ from django.urls import reverse
 
 
 class CommonModel(models.Model):
-    class Meta:
-        abstract = True
-
     idnumber = models.CharField(
         unique=True,
         blank=True,
@@ -29,104 +26,105 @@ class CommonModel(models.Model):
         null=True, blank=True, verbose_name="Комментарий для этой записи", max_length=1024
     )
 
-    @classmethod
-    def last_modified_record(cls) -> Optional[Self]:
-        return cls.objects.order_by("-datemodified").first()
+    class Meta:
+        abstract = True
 
     def __str__(self):
         return self.__repr__()
 
+    @classmethod
+    def last_modified_record(cls) -> Optional[Self]:
+        return cls.objects.order_by("-datemodified").first()
+
+
 
 class Subject(CommonModel):
-    class Meta:
+    name = models.CharField(max_length=256, verbose_name="Название")
+
+    class Meta: # type: ignore
         verbose_name = "Предмет"
         verbose_name_plural = "Предметы"
 
-    name = models.CharField(max_length=256, verbose_name="Название")
 
     def __repr__(self):
         return str(self.name)
 
 
 class TimeSlot(CommonModel):
-    class Meta:
-        verbose_name = "Время проведения события"
-        verbose_name_plural = "Времена проведения события"
-
     alt_name = models.TextField(blank=True, null=True, verbose_name="Академ. часы пары")
     start_time = models.TimeField(verbose_name="Время начала")
     end_time = models.TimeField(blank=True, null=True, verbose_name="Время окончания")
 
-    def clean(self):
-        if self.end_time and self.end_time <= self.start_time:
-            raise ValidationError("Время проведения не корректно")
+    class Meta: # type: ignore
+        verbose_name = "Время проведения события"
+        verbose_name_plural = "Времена проведения события"
 
     def __repr__(self):
         res = self.start_time.strftime("%H:%M").removeprefix("0")
-
         if self.end_time:
             res += "-{}".format(self.end_time.strftime("%H:%M"))
-        
         if self.alt_name:
             return f"{self.alt_name}ч. / {res}"
         else:
             return f"{res}"
 
+    def clean(self):
+        if self.end_time and self.end_time <= self.start_time:
+            raise ValidationError("Время проведения не корректно")
+
 
 class EventPlace(CommonModel):
-    class Meta:
-        verbose_name = "Место проведения события"
-        verbose_name_plural = "Места проведения события"
-
     building = models.CharField(blank=True, default="", db_default="", max_length=128, verbose_name="Корпус")
     room = models.CharField(max_length=64, verbose_name="Аудитория")
 
+    class Meta: # type: ignore
+        verbose_name = "Место проведения события"
+        verbose_name_plural = "Места проведения события"
+
     def __repr__(self):
         return f"{self.building} {self.room}"
-    
+
     def get_absolute_url(self):
         return reverse("admin:common_eventplace_change", args=[self.pk])
 
 
 class EventKind(CommonModel):
-    class Meta:
+    name = models.CharField(verbose_name="Название типа", max_length=64)
+
+    class Meta: # type: ignore
         verbose_name = "Тип события"
         verbose_name_plural = "Типы событий"
 
-    name = models.CharField(verbose_name="Название типа", max_length=64)
 
     def __repr__(self):
         return str(self.name)
 
 
 class AbstractDay(CommonModel):
-    class Meta:
+    day_number = models.IntegerField(verbose_name="Смещение от начала повторяющгося фрагмента (пн. первой недели)")
+    name = models.CharField(verbose_name="Имя дня в рамках шаблона", max_length=64)
+
+    class Meta: # type: ignore
         verbose_name = "Абстрактный день"
         verbose_name_plural = "Абстрактные дни"
 
-    day_number = models.IntegerField(verbose_name="Смещение от начала повторяющгося фрагмента (пн. первой недели)")
-    name = models.CharField(verbose_name="Имя дня в рамках шаблона", max_length=64)
 
     def __repr__(self):
         return f"{str(self.name)}"
 
 
 class Organization(CommonModel):
-    class Meta:
+    name = models.CharField(verbose_name="Имя учреждения", max_length=64)
+
+    class Meta: # type: ignore
         verbose_name = "Учреждение"
         verbose_name_plural = "Учреждения"
-
-    name = models.CharField(verbose_name="Имя учреждения", max_length=64)
 
     def __repr__(self):
         return str(self.name)
 
 
 class Department(CommonModel):
-    class Meta:
-        verbose_name = "Подразделение"
-        verbose_name_plural = "Подразделения"
-
     name = models.CharField(verbose_name="Имя подразделения", max_length=128)
     shortname = models.CharField(blank=True, null=True, verbose_name="Аббревиатура", max_length=16)
     code = models.CharField(verbose_name="Код подразделения", max_length=16)
@@ -139,15 +137,16 @@ class Department(CommonModel):
         )
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, verbose_name="Учреждение")
 
+    class Meta: # type: ignore
+        verbose_name = "Подразделение"
+        verbose_name_plural = "Подразделения"
+
+
     def __repr__(self):
         return str(self.name)
 
 
 class ScheduleTemplateMetadata(CommonModel):
-    class Meta:
-        verbose_name = "Метаданные шаблона расписания"
-        verbose_name_plural = "Метаданные шаблона расписания"
-
     class Scope(models.TextChoices):
         BACHELOR = "bachelor", "Бакалавриат"
         MASTER = "master", "Магистратура"
@@ -157,49 +156,54 @@ class ScheduleTemplateMetadata(CommonModel):
     faculty = models.CharField(max_length=32, verbose_name="Факультет")
     scope = models.CharField(choices=Scope, max_length=32, verbose_name="Обучение")
 
+    class Meta: # type: ignore
+        verbose_name = "Метаданные шаблона расписания"
+        verbose_name_plural = "Метаданные шаблона расписания"
+
     def __repr__(self):
         return f"{self.faculty}, {self.Scope(self.scope).label}"
 
 
 class ScheduleMetadata(CommonModel):
-    class Meta:
-        verbose_name = "Метаданные расписания"
-        verbose_name_plural = "Метаданные расписания"
-
     years = models.CharField(max_length=16, verbose_name="Учебный год")
     course = models.IntegerField(verbose_name="Курс")
     semester = models.IntegerField(verbose_name="Семестр")
-    
+
+    class Meta: # type: ignore
+        verbose_name = "Метаданные расписания"
+        verbose_name_plural = "Метаданные расписания"
+
     def __repr__(self):
         return f"{self.years}, {self.course}курс, {self.semester}сем"
 
 
 class ScheduleTemplate(CommonModel):
-    class Meta:
-        verbose_name = "Шаблон расписания"
-        verbose_name_plural = "Шаблоны расписаний"
-
     metadata = models.ForeignKey(ScheduleTemplateMetadata, null=True, on_delete=models.PROTECT, verbose_name="Факультет, обучение")
     repetition_period = models.IntegerField(verbose_name="Период повторения в днях")
     repeatable = models.BooleanField(verbose_name="Повторяется ли")
     aligned_by_week_day = models.IntegerField(verbose_name="Выравнивание относительно дня недели (null=0, пн=1, ...)")
     department = models.ForeignKey(Department, null=True, on_delete=models.SET_NULL, verbose_name="Подразделение")
 
+    class Meta: # type: ignore
+        verbose_name = "Шаблон расписания"
+        verbose_name_plural = "Шаблоны расписаний"
+
+
     def __repr__(self):
         if self.repetition_period in [0, 5, 6, 7, 8, 9] or self.repetition_period // 10 == 1:
             return f"{self.department}, каждые {self.repetition_period} дней"
-        
+
         if self.repetition_period % 10 == 1:
             return f"{self.department}, каждый {self.repetition_period} день"
-        
+
         if self.repetition_period % 10 in [2, 3, 4]:
             return f"{self.department}, каждые {self.repetition_period} дня"
-        
+
         return f"{self.department}"
-    
-    def save(self, **kwargs):
+
+    def save(self, *args, **kwargs):
         super().save(**kwargs)
-        
+
         from apps.common.selectors import Selector
         from apps.common.services.timetable.read.filters import AbstractEventFilter
         from apps.common.services.timetable.write.factories import rewrite_events
@@ -207,17 +211,13 @@ class ScheduleTemplate(CommonModel):
         reader = Selector({"schedule__schedule_template" : self})
         # getting AbstractEvents with existing Events
         reader.add_filter(AbstractEventFilter.with_existing_events())
-        
+
         reader.find_models(AbstractEvent)
 
         rewrite_events(reader.get_found_models())
 
 
 class Schedule(CommonModel):
-    class Meta:
-        verbose_name = "Расписание"
-        verbose_name_plural = "Расписания"
-
     class Status(models.IntegerChoices):
         ACTIVE = 0, "Активно"
         DISABLED = 1, "Отключено"
@@ -231,22 +231,16 @@ class Schedule(CommonModel):
     starting_day_number = models.ForeignKey(AbstractDay, null=True, on_delete=models.PROTECT, verbose_name="Номер дня начала первого повторяющегося цикла") 
     schedule_template = models.ForeignKey(ScheduleTemplate, null=True, on_delete=models.PROTECT, verbose_name="Шаблон расписания")
 
-    def first_event(self):
-        events = self.events.all()
-
-        return events.annotate(min_date=models.Min("holdings__date")).order_by("min_date").first() ####
-
-    def last_event(self):
-        events = self.events.all()
-
-        return events.annotate(max_date=models.Max("holdings__date")).order_by("-max_date").first()   ######
+    class Meta: # type: ignore
+        verbose_name = "Расписание"
+        verbose_name_plural = "Расписания"
 
     def __repr__(self):
         return f"{self.Status(self.status).label}, {self.schedule_template.metadata}, {self.metadata}"
-    
-    def save(self, **kwargs):
+
+    def save(self, *args, **kwargs):
         super().save(**kwargs)
-        
+
         from apps.common.selectors import Selector
         from apps.common.services.timetable.read.filters import AbstractEventFilter
         from apps.common.services.timetable.write.factories import rewrite_events
@@ -254,17 +248,23 @@ class Schedule(CommonModel):
         reader = Selector({"schedule" : self})
         # getting AbstractEvent with existing Event
         reader.add_filter(AbstractEventFilter.with_existing_events())
-        
+
         reader.find_models(AbstractEvent)
 
         rewrite_events(reader.get_found_models())
 
+    def first_event(self):
+        events = self.events.all() # type: ignore
+
+        return events.annotate(min_date=models.Min("holdings__date")).order_by("min_date").first() ####
+
+    def last_event(self):
+        events = self.events.all() # type: ignore
+
+        return events.annotate(max_date=models.Max("holdings__date")).order_by("-max_date").first()   ######
+
 
 class EventParticipant(CommonModel):
-    class Meta:
-        verbose_name = "Участник события"
-        verbose_name_plural = "Участники события"
-
     class Role(models.TextChoices):
         STUDENT = "student", "Студент"
         TEACHER = "teacher", "Преподаватель"
@@ -275,18 +275,18 @@ class EventParticipant(CommonModel):
     is_group = models.BooleanField(verbose_name="Является группой", default=False)
     department = models.ForeignKey(Department, null=True, on_delete=models.SET_NULL, verbose_name="Подразделение")
 
+    class Meta: # type: ignore
+        verbose_name = "Участник события"
+        verbose_name_plural = "Участники события"
+
     def __repr__(self):
         return f"{self.name} ({self.role})"
-    
+
     def get_absolute_url(self):
         return reverse("admin:common_eventparticipant_change", args=[self.pk])
 
 
 class AbstractEventChanges(CommonModel):
-    class Meta:
-        verbose_name = "Изменения в запланированном событии"
-        verbose_name_plural = "Изменения в запланированных событиях"
-
     group = models.TextField(null=True, default="", verbose_name="Группа")
     date_time = models.TextField(null=True, default="", verbose_name="Дата и учебный час")
     subject = models.TextField(null=True, verbose_name="Занятие")
@@ -303,13 +303,18 @@ class AbstractEventChanges(CommonModel):
     final_holds_on_date = models.TextField(null=True, blank=True, default="", verbose_name="Заданный день после изменений")
     final_kind = models.TextField(null=True, blank=True, default="", verbose_name="Тип после изменений")
 
+    class Meta: # type: ignore
+        verbose_name = "Изменения в запланированном событии"
+        verbose_name_plural = "Изменения в запланированных событиях"
+
+
     def __repr__(self):
         return f"{self.group}, {self.date_time}, {self.subject}"
-    
+
     def __str__(self):
         return f"{self.group}, {self.date_time}, {self.subject}"
-    
-    def save(self, **kwargs):
+
+    def save(self, *args, **kwargs):
         super().save(**kwargs)
 
         # when logging AbsEvent deleting
@@ -331,7 +336,7 @@ class AbstractEventChanges(CommonModel):
 
         if self.final_kind and self.origin_holds_on_date == self.final_kind:
             self.final_kind = None
-    
+
     @staticmethod
     def str_from_participants(participants) -> str:
         """Makes formated str to store from given EventParticipant
@@ -342,9 +347,9 @@ class AbstractEventChanges(CommonModel):
         for p in participants:
             return_value += f"{p.name}, "
         return_value = return_value[:-2]
-        
+
         return return_value
-    
+
     @staticmethod
     def str_from_places(places) -> str:
         """Makes formated str to store from given EventPlace
@@ -362,13 +367,13 @@ class AbstractEventChanges(CommonModel):
     def str_from_date_time(abstract_event) -> str:
         """Makes formated str to store from given AbstractEvent's day and time_slot
         """
-        
+
         return f"{abstract_event.abstract_day} / {abstract_event.time_slot.alt_name}ч."
 
     def initialize(self, ae):
         """Fills model with origin values from given AbstractEvent
         """
-        
+
         self.group = self.str_from_participants(ae.get_groups())
         self.date_time = self.str_from_date_time(ae)
         self.subject = ae.subject.name
@@ -380,43 +385,43 @@ class AbstractEventChanges(CommonModel):
     def get_export_data(self) -> list[list[str]]:
         """Prepare stored data to export
         """
-        
+
         export_data_base = [self.datemodified.strftime('%Y-%m-%d %H:%M:%S'), self.group, self.date_time, self.subject]
         export_data = []
 
         if self.is_deleted:
-            export_data.append(export_data_base + ["УДАЛЕНО"])
+            export_data.append([*export_data_base, "УДАЛЕНО"])
         else:
             if self.is_created:
-                export_data.append(export_data_base + ["СОЗДАНО"])
+                export_data.append([*export_data_base, "СОЗДАНО"])
 
             if self.final_teachers:
-                export_data.append(export_data_base + ["ПРЕПОДАВАТЕЛЬ", self.origin_teachers, self.final_teachers])
+                export_data.append([*export_data_base, "ПРЕПОДАВАТЕЛЬ", self.origin_teachers, self.final_teachers])
 
             if self.final_places:
-                export_data.append(export_data_base + ["АУДИТОРИЯ", self.origin_places, self.final_places])
-            
+                export_data.append([*export_data_base, "АУДИТОРИЯ", self.origin_places, self.final_places])
+
             if self.final_date_time:
-                export_data.append(export_data_base + ["ДЕНЬ НЕДЕЛИ/УЧ. ЧАС", self.date_time, self.final_date_time])
+                export_data.append([*export_data_base, "ДЕНЬ НЕДЕЛИ/УЧ. ЧАС", self.date_time, self.final_date_time])
 
             if self.final_holds_on_date:
-                export_data.append(export_data_base + ["ЯВНАЯ ДАТА", self.origin_holds_on_date, self.final_holds_on_date])
+                export_data.append([*export_data_base, "ЯВНАЯ ДАТА", self.origin_holds_on_date, self.final_holds_on_date])
 
             if self.final_kind:
-                export_data.append(export_data_base + ["ТИП", self.origin_kind, self.final_kind])
+                export_data.append([*export_data_base, "ТИП", self.origin_kind, self.final_kind])
 
         self.is_exported = True
-        
+
         self.save()
 
         self.clear_relation_with_abs_event()
 
         return export_data
-    
+
     def clear_relation_with_abs_event(self) -> None:
         """Removes all references to self from related AbstractEvents
         """
-        
+
         for ae in AbstractEvent.objects.filter(changes=self):
             ae.changes = None
 
@@ -424,10 +429,6 @@ class AbstractEventChanges(CommonModel):
 
 
 class AbstractEvent(CommonModel):
-    class Meta:
-        verbose_name = "Запланированное событие"
-        verbose_name_plural = "Запланированные события"
-
     kind = models.ForeignKey(EventKind, null=True, blank=True, default=None, on_delete=models.PROTECT, verbose_name="Тип")
     subject = models.ForeignKey(Subject, on_delete=models.PROTECT, verbose_name="Предмет")
     participants = models.ManyToManyField(EventParticipant, verbose_name="Участники")
@@ -439,10 +440,14 @@ class AbstractEvent(CommonModel):
     schedule = models.ForeignKey(Schedule, null=True, on_delete=models.CASCADE, related_name="events", verbose_name="Расписание")
     changes = models.ForeignKey(AbstractEventChanges, null=True, blank=True, on_delete=models.SET_NULL, editable=False, verbose_name="Изменения")
 
+    class Meta: # type: ignore
+        verbose_name = "Запланированное событие"
+        verbose_name_plural = "Запланированные события"
+
     def __repr__(self):
         return f"Занятие по {self.subject.name}, {self.time_slot.alt_name}ч."
-    
-    def save(self, **kwargs):
+
+    def save(self, *args, **kwargs):
         super().save(**kwargs)
 
         from apps.common.services.timetable.write.factories import (
@@ -451,24 +456,21 @@ class AbstractEvent(CommonModel):
 
         # Calling here because need updated AbstractEvent reference inside Events
         refresh_related_events(self, update_m2m=False)
-    
+
     @property
     def department(self):
         """Returns Event Department
         """
-        
         return self.schedule.schedule_template.department
-    
+
     def get_groups(self):
         """Filter and returns groups from participants 
         """
-        
         return self.participants.filter(is_group=True)
-    
+
     def get_teachers(self):
         """Filter and returns teachers from participants 
         """
-
         return self.participants.filter(role__in=[EventParticipant.Role.TEACHER, EventParticipant.Role.ASSISTANT])
     
     def get_absolute_url(self):
@@ -481,9 +483,9 @@ class AbstractEvent(CommonModel):
 
         Not saving self instance on complete
         """
-        
+
         changes = AbstractEventChanges()
-        
+
         changes.date_time = AbstractEventChanges.str_from_date_time(self)
         changes.subject = self.subject.name
         changes.is_created = True
@@ -514,7 +516,7 @@ class AbstractEvent(CommonModel):
         # continue only if something changed
         if not is_date_time_changed and not is_holds_on_date_changed and not is_kind_changed:
             return
-        
+
         changes = previous_ae.changes
 
         if not changes:
@@ -534,10 +536,10 @@ class AbstractEvent(CommonModel):
         changes.save()
 
         self.changes = changes
-            
+
 
 class EventCancel(CommonModel):
-    class Meta:
+    class Meta: # type: ignore
         verbose_name = "Отмена событий"
         verbose_name_plural = "Отмены событий"
 
@@ -545,11 +547,11 @@ class EventCancel(CommonModel):
     department = models.ForeignKey(Department, on_delete=models.CASCADE, verbose_name="Подразделение")
 
     def __repr__(self):
-        return f"Отмена событий на {self.date}"    
-    
-    def save(self, **kwargs):
+        return f"Отмена событий на {self.date}"
+
+    def save(self, *args, **kwargs):
         super().save(**kwargs)
-        
+
         from apps.common.selectors import Selector
         from apps.common.services.timetable.read.filters import (
             DateFilter,
@@ -559,26 +561,26 @@ class EventCancel(CommonModel):
 
         reader = Selector(DateFilter.from_singe_date(self.date))
         reader.add_filter(EventFilter.by_department(self.department))
-        
+
         reader.find_models(Event)
-        
+
         for e in reader.get_found_models():
             apply_event_cancel(self, e)
 
 
 class DayDateOverride(CommonModel):
-    class Meta:
-        verbose_name = "Перенос дня на другую дату"
-        verbose_name_plural = "Переносы дней на другие даты"
-
     day_source = models.DateField(blank=False, verbose_name="Перенести с даты")
     day_destination = models.DateField(blank=False, verbose_name="Перенести на дату")
     department = models.ForeignKey(Department, null=True, on_delete=models.CASCADE, verbose_name="Подразделение")
 
+    class Meta: # type: ignore
+        verbose_name = "Перенос дня на другую дату"
+        verbose_name_plural = "Переносы дней на другие даты"
+
     def __repr__(self):
         return f"Перенос с {self.day_source} на {self.day_destination}"
-    
-    def save(self, **kwargs):
+
+    def save(self, *args, **kwargs):
         super().save(**kwargs)
 
         from apps.common.selectors import Selector
@@ -592,18 +594,14 @@ class DayDateOverride(CommonModel):
 
         reader = Selector(DateFilter.from_singe_date(self.day_source))
         reader.add_filter(EventFilter.by_department(self.department))
-        
+
         reader.find_models(Event)
-        
+
         for e in reader.get_found_models():
             apply_day_date_override(self, e)
 
 
 class Event(CommonModel):
-    class Meta:
-        verbose_name = "Событие"
-        verbose_name_plural = "События"
-
     date = models.DateField(null=True, blank=False, verbose_name="Дата")
     date_override = models.ForeignKey(DayDateOverride, null=True, blank=True, editable=False, on_delete=models.SET_NULL, verbose_name="Перенос дня")
     kind_override = models.ForeignKey(EventKind, null=True, blank=True, default=None, on_delete=models.PROTECT, verbose_name="Тип")
@@ -616,18 +614,22 @@ class Event(CommonModel):
     event_cancel = models.ForeignKey(EventCancel, null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Отмена события")
     is_event_overriden = models.BooleanField(verbose_name="Событие изменено вручную", default=False)
 
+    class Meta: # type: ignore
+        verbose_name = "Событие"
+        verbose_name_plural = "События"
+
+    def __repr__(self):
+        return f"Занятие по {self.abstract_event.subject.name}"
+
     @property
     def department(self):
         return self.abstract_event.schedule.schedule_template.department
-    
+
     def get_groups(self):
         return self.participants_override.filter(is_group=True)
-    
+
     def get_teachers(self):
         return self.participants_override.filter(role__in=[EventParticipant.Role.TEACHER, EventParticipant.Role.ASSISTANT])
-
-    def __repr__(self):
-        return f"Занятие по {self.abstract_event.subject.name}"    
 
     def check_date_interactions(self):
         """Checks Event date and attaching/detaching DayDateOverride if needed

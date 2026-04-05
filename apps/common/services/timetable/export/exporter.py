@@ -8,10 +8,10 @@ from django.http import HttpResponse
 def export_abstract_event_changes(abs_event_changes) -> HttpResponse|None:
     """Makes XLS file for given AbstractEventChanges
     """
-    
+
     if not abs_event_changes.exists():
         return None
-    
+
     output = io.BytesIO()
     workbook = xlsxwriter.Workbook(output)
     worksheet = workbook.add_worksheet()
@@ -29,7 +29,7 @@ def export_abstract_event_changes(abs_event_changes) -> HttpResponse|None:
             row += 1
 
         row += 1
-    
+
     worksheet.autofit()
     workbook.close()
 

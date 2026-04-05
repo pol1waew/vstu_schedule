@@ -134,7 +134,7 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "static"
 STATICFILES_DIRS = [
-    ("client", "apps/client/static"),
+    BASE_DIR / "apps" / "client" / "static",
 ]
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"

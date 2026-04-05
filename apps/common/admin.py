@@ -64,7 +64,7 @@ class SubjectAdmin(BaseAdmin):
     search_fields = ("name",)
 
     def get_urls(self):
-        return [path("import_subject_reference/", self.import_subject_reference)] + super().get_urls()
+        return [path("import_subject_reference/", self.import_subject_reference), *super().get_urls()]
 
     def import_subject_reference(self, request):
         if request.method == "POST" and request.FILES.get("subject_reference_file"):
@@ -83,7 +83,8 @@ class EventParticipantAdmin(BaseAdmin):
 
     def get_urls(self):
         return [path("import_teacher_reference/", self.import_teacher_reference),
-                path("import_student_reference/", self.import_student_reference)] + super().get_urls()
+                path("import_student_reference/", self.import_student_reference),
+                *super().get_urls()]
 
     def import_teacher_reference(self, request):
         if request.method == "POST" and request.FILES.get("teacher_reference_file"):
@@ -91,7 +92,7 @@ class EventParticipantAdmin(BaseAdmin):
             messages.success(request, "Импорт успешно произведён")
 
         return HttpResponseRedirect("../")
-    
+
     def import_student_reference(self, request):
         if request.method == "POST" and request.FILES.get("student_reference_file"):
             ReferenceImporter.import_student_reference(request.FILES['student_reference_file'].read())
@@ -108,7 +109,8 @@ class EventPlaceAdmin(BaseAdmin):
     list_filter = ("building",)
 
     def get_urls(self):
-        return [path("import_place_reference/", self.import_place_reference)] + super().get_urls()
+        return [path("import_place_reference/", self.import_place_reference), 
+                *super().get_urls()]
 
     def import_place_reference(self, request):
         if request.method == "POST" and request.FILES.get("place_reference_file"):
@@ -168,7 +170,8 @@ class ScheduleAdmin(BaseAdmin):
 
     def get_urls(self):
         return [path("import_schedule/", self.import_schedule_data),
-                path("delete_archive_schedules/", self.delete_archive_schedules)] + super().get_urls()
+                path("delete_archive_schedules/", self.delete_archive_schedules),
+                *super().get_urls()]
 
     def import_schedule_data(self, request):
         if request.method == "POST" and request.FILES.get("selected_file"):
@@ -179,13 +182,13 @@ class ScheduleAdmin(BaseAdmin):
             messages.success(request, "Импорт успешно произведён")
 
         return HttpResponseRedirect("../")
-    
+
     ## TODO: add confirming page
     def delete_archive_schedules(self, request):
         Schedule.objects.filter(status=Schedule.Status.ARCHIVE).delete()
 
         return HttpResponseRedirect("../")
-    
+
     ## TODO: ...
     @admin.action(description="Удалить выбранные Расписания и их Метаданные расписания")
     def extended_delete(modeladmin, request, queryset):
@@ -234,10 +237,9 @@ class EventAdmin(BaseAdmin):
                 return queryset.filter(**EventFilter.overriden())
             elif self.value() in self.NOT_OVERRIDEN_VALUES:
                 return queryset.filter(**EventFilter.not_overriden())
-            
+
             return queryset
 
-    
     list_display = ("subject_override", "date", "abstract_day", "time_slot_override")
     search_fields = ("participants_override__name", "subject_override__name", "places_override__building", "places_override__room", "kind_override__name", "date")
     list_filter = (EventOverridenFilter, "kind_override", "is_event_canceled")
@@ -260,7 +262,6 @@ class AbstractEventChangesAdmin(BaseAdmin):
     def delete_exported(modeladmin, request, queryset):
         """Deletes already exported AbstractEventChanges
         """
-        
         AbstractEventChanges.objects.filter(is_exported=True).delete()
 
         messages.success(request, "Успешно удалены")
@@ -269,7 +270,6 @@ class AbstractEventChangesAdmin(BaseAdmin):
     def export_selected(modeladmin, request, queryset):
         """Export XLS form given AbstractEventChanges
         """
-        
         response = export_abstract_event_changes(queryset)
 
         messages.success(request, "Успешно экспортированы")
@@ -293,18 +293,18 @@ class AbstractEventChangesAdmin(BaseAdmin):
         messages.success(request, "Успешно экспортированы")
 
         return response
-        
+
     def changelist_view(self, request, extra_context = None):
         """Allows user to interact with specified actions without selecting models
         """
-        
+
         if "action" in request.POST and request.POST["action"] in ["export_not_exported", "delete_exported"]:
             post = request.POST.copy()
 
             # makes request never empty
             post.update({ admin.helpers.ACTION_CHECKBOX_NAME : "0" })
 
-            request._set_post(post)
+            request._set_post(post) # TODO: это не очень хорошо
 
         return super(AbstractEventChangesAdmin, self).changelist_view(request, extra_context)
 
@@ -319,7 +319,7 @@ class AbstractEventAdmin(BaseAdmin):
     actions = ["delete_events", "fill", "check_fields"]
 
     def get_urls(self):
-        return [path("import_data/", self.import_event_data)] + super().get_urls()
+        return [path("import_data/", self.import_event_data), *super().get_urls()]
 
     def import_event_data(self, request):
         if request.method == "POST" and request.FILES.get("selected_file"):
@@ -333,7 +333,7 @@ class AbstractEventAdmin(BaseAdmin):
     def delete_events(modeladmin, request, queryset):
         """Deletes all Events related with given AbstractEvents
         """
-        
+
         Event.objects.filter(abstract_event__in=queryset).delete()
         messages.success(request, "Связанные события успешно удалены")
 
@@ -341,7 +341,7 @@ class AbstractEventAdmin(BaseAdmin):
     def fill(modeladmin, request, queryset):
         """Fills semester with Events from given AbstractEvents
         """
-        
+
         if rewrite_events(queryset):
             messages.success(request, "Успешно заполнено")
         else:
@@ -351,7 +351,7 @@ class AbstractEventAdmin(BaseAdmin):
     def check_fields(modeladmin, request, queryset):
         """Checks for double usage selected AbstractEvents field values
         """
-        
+
         is_any_warning_shown = False
 
         for ae in queryset:
@@ -373,7 +373,7 @@ class AbstractDayAdmin(BaseAdmin):
     search_fields = ("name", "day_number")
 
     def get_urls(self):
-        return [path("create_abstract_days/", self.create_abstract_days)] + super().get_urls()
+        return [path("create_abstract_days/", self.create_abstract_days), *super().get_urls()]
 
     def create_abstract_days(self, request):
         if create_common_abstract_days():
@@ -398,17 +398,18 @@ class DepartmentAdmin(BaseAdmin):
                 return queryset.filter(parent_department__isnull=False)
             elif self.value() in self.HAS_NOT_VALUES:
                 return queryset.filter(parent_department__isnull=True)
-            
+
             return queryset
-        
+
     change_list_template = "../templates/timetable/admin/departmentChangeListExtend.html"
     list_display = ("name", "shortname", "organization_name")
     search_fields = ("name", "shortname", "organization__name")
     list_filter = (HasParentDepartmentFilter, "organization__name")
 
     def get_urls(self):
-        return [path("import_faculty_reference/", self.import_faculty_reference), 
-                path("import_department_reference/", self.import_department_reference)] + super().get_urls()
+        return [path("import_faculty_reference/", self.import_faculty_reference),
+                path("import_department_reference/", self.import_department_reference),
+                *super().get_urls()]
 
     def import_faculty_reference(self, request):
         if request.method == "POST" and request.FILES.get("faculty_reference_file"):
@@ -416,14 +417,14 @@ class DepartmentAdmin(BaseAdmin):
             messages.success(request, "Импорт успешно произведён")
 
         return HttpResponseRedirect("../")
-    
+
     def import_department_reference(self, request):
         if request.method == "POST" and request.FILES.get("department_reference_file"):
             ReferenceImporter.import_department_reference(request.FILES['department_reference_file'].read())
             messages.success(request, "Импорт успешно произведён")
 
         return HttpResponseRedirect("../")
-    
+
     @admin.display(description=Department._meta.get_field("organization").verbose_name, 
                    ordering="organization__name")
     def organization_name(self, obj):
@@ -438,7 +439,7 @@ class OrganizationAdmin(BaseAdmin):
     list_filter = ("name",)
 
     def get_urls(self):
-        return [path("create_organization/", self.create_organization)] + super().get_urls()
+        return [path("create_organization/", self.create_organization), *super().get_urls()]
 
     def create_organization(self, request):
         try:
@@ -458,7 +459,7 @@ class TimeSlotAdmin(BaseAdmin):
     list_filter = ("alt_name",)
 
     def get_urls(self):
-        return [path("create_time_slots/", self.create_time_slots)] + super().get_urls()
+        return [path("create_time_slots/", self.create_time_slots), *super().get_urls()]
 
     def create_time_slots(self, request):
         if create_common_time_slots():
@@ -478,13 +479,12 @@ class DayDateOverrideAdmin(BaseAdmin):
     def override(modeladmin, request, queryset):
         """Applies selected DayDateOverrides
         """
-        
         for ddo in queryset:
             reader = Selector(DateFilter.from_singe_date(ddo.day_source))
             reader.add_filter(EventFilter.by_department(ddo.department))
-            
+
             reader.find_models(Event)
-            
+
             for e in reader.get_found_models():
                 apply_day_date_override(ddo, e)
 
